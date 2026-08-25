@@ -9,6 +9,13 @@ import {
   type Credentials,
 } from "@/server/whatsapp/credentials";
 import { isWindowOpen } from "@/server/inbox/window";
+import { IG_PREFIX } from "@/server/inbox/identity";
+import {
+  getInstagramCredentialsByOrg,
+  markInstagramReconnectRequired,
+  type InstagramCredentials,
+} from "@/server/instagram/credentials";
+import { fitsInstagramText, sendInstagramText } from "@/server/instagram/send";
 import { serializeMessage } from "@/server/inbox/ingest";
 import {
   saveMediaFile,
@@ -40,8 +47,11 @@ type SendResult = { messageId: string };
 
 type SendTarget = {
   conversation: typeof schema.conversation.$inferSelect;
-  credentials: Credentials;
+  /** null cuando el destino no es WhatsApp (014). */
+  credentials: Credentials | null;
   recipient: string;
+  /** 014: presente solo en conversaciones de Instagram. */
+  instagram?: InstagramCredentials;
 };
 
 /**
@@ -76,6 +86,34 @@ async function prepareSend(
       "sandbox_violation",
       "Conversación de prueba del Laboratorio: el envío real está prohibido"
     );
+  }
+
+  // 014: Instagram tiene su propio transporte, su propia ventana y NO tiene
+  // plantillas. Se resuelve antes que las credenciales de WhatsApp para no
+  // exigirle a una instancia de solo-Instagram un numero conectado.
+  if (row.conversation.channel === "instagram") {
+    const igCreds = await getInstagramCredentialsByOrg(organizationId);
+    if (!igCreds) {
+      throw new SendError(
+        "not_connected",
+        "No hay cuenta de Instagram conectada"
+      );
+    }
+    if (igCreds.status === "reconnect_required") {
+      throw new SendError(
+        "reconnect_required",
+        "El token de Instagram expiró: reconecta la cuenta en Configuración"
+      );
+    }
+    const igRecipient = row.contact.waIdentity.startsWith(IG_PREFIX)
+      ? row.contact.waIdentity.slice(IG_PREFIX.length)
+      : row.contact.waIdentity;
+    return {
+      conversation: row.conversation,
+      credentials: null,
+      recipient: igRecipient,
+      instagram: igCreds,
+    };
   }
 
   if (!isWindowOpen(row.conversation.lastInboundAt)) {
@@ -167,17 +205,17 @@ export async function sendText(input: {
   text: string;
   aiGenerated?: boolean;
 }): Promise<SendResult> {
-  const { credentials, recipient } = await prepareSend(
-    input.conversationId,
-    input.organizationId
-  );
+  const target = await prepareSend(input.conversationId, input.organizationId);
+  const { credentials, recipient } = target;
 
-  const waMessageId = await callGraphSend(credentials, {
-    messaging_product: "whatsapp",
-    to: recipient,
-    type: "text",
-    text: { body: input.text },
-  });
+  const waMessageId = target.instagram
+    ? await callInstagramSend(target, input.text)
+    : await callGraphSend(credentials!, {
+        messaging_product: "whatsapp",
+        to: recipient,
+        type: "text",
+        text: { body: input.text },
+      });
 
   const messageId = await persistOutbound({
     organizationId: input.organizationId,
@@ -208,10 +246,16 @@ export async function sendMediaMessage(input: {
   // Validación previa (FR-007): tipo y tamaño antes de tocar disco o red.
   const kind = validateOutgoing(input.file.mimeType, input.file.data.byteLength);
 
-  const { credentials, recipient } = await prepareSend(
-    input.conversationId,
-    input.organizationId
-  );
+  const target = await prepareSend(input.conversationId, input.organizationId);
+  const { credentials, recipient } = target;
+  if (target.instagram) {
+    // 014 fuera de alcance: adjuntos salientes en Instagram. Fallar claro es
+    // mejor que mandarlo por el transporte equivocado.
+    throw new SendError(
+      "meta_error",
+      "Todavía no se pueden enviar adjuntos por Instagram; manda el texto"
+    );
+  }
 
   const db = getDb();
   const assetId = newId("mediaAsset");
@@ -237,7 +281,7 @@ export async function sendMediaMessage(input: {
   const asset = assetRows[0]!;
 
   try {
-    const waMediaId = await uploadGraphMedia(credentials, input.file);
+    const waMediaId = await uploadGraphMedia(credentials!, input.file);
     await db
       .update(schema.mediaAsset)
       .set({ waMediaId, updatedAt: new Date() })
@@ -248,7 +292,7 @@ export async function sendMediaMessage(input: {
     if (kind === "document" && input.file.fileName) {
       mediaPayload.filename = input.file.fileName;
     }
-    const waMessageId = await callGraphSend(credentials, {
+    const waMessageId = await callGraphSend(credentials!, {
       messaging_product: "whatsapp",
       to: recipient,
       type: kind,
@@ -336,7 +380,7 @@ export async function sendStructured(
           })),
         };
 
-  const waMessageId = await callGraphSend(credentials, {
+  const waMessageId = await callGraphSend(credentials!, {
     messaging_product: "whatsapp",
     to: recipient,
     ...payload,
@@ -393,6 +437,59 @@ export async function callGraphSend(
       }
       if (err.status === 0 || err.status >= 500) {
         throw new SendError("meta_unavailable", "Meta no está disponible ahora");
+      }
+      throw new SendError("meta_error", err.message);
+    }
+    throw err;
+  }
+}
+
+
+/**
+ * 014 — Envío por el canal de Instagram. Traduce los fallos al mismo
+ * vocabulario de SendError que ya usa WhatsApp, para que la bandeja no tenga
+ * que aprender un idioma por plataforma.
+ */
+async function callInstagramSend(
+  target: SendTarget,
+  text: string
+): Promise<string> {
+  const creds = target.instagram!;
+
+  if (!fitsInstagramText(text)) {
+    throw new SendError(
+      "meta_error",
+      "Instagram no acepta mensajes de más de 1000 bytes: acorta el texto"
+    );
+  }
+
+  // Instagram no tiene plantillas: fuera de la ventana de 24 h la única vía
+  // es la etiqueta de agente humano (hasta 7 días).
+  const humanAgentTag = !isWindowOpen(target.conversation.lastInboundAt);
+
+  try {
+    const res = await sendInstagramText({
+      credentials: creds,
+      recipient: target.recipient,
+      threadRef: target.conversation.channelThreadRef,
+      text,
+      humanAgentTag,
+    });
+    return res.platformMessageId;
+  } catch (err) {
+    if (err instanceof MetaApiError) {
+      if (err.isAuthError) {
+        await markInstagramReconnectRequired(creds.organizationId);
+        throw new SendError(
+          "reconnect_required",
+          "El token de Instagram expiró o fue revocado: reconecta la cuenta"
+        );
+      }
+      if (err.status === 0 || err.status >= 500) {
+        throw new SendError(
+          "meta_unavailable",
+          "Instagram no está disponible en este momento; intenta de nuevo"
+        );
       }
       throw new SendError("meta_error", err.message);
     }

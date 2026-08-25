@@ -116,6 +116,20 @@ export const contact = pgTable(
      * Llave de resolución WhatsApp (003): teléfono normalizado (521→52) o
      * `bsuid:<id>` cuando Meta no manda wa_id. Estable de por vida.
      */
+    /**
+     * 014: canal por el que vive este contacto. Aditivo y con default: toda
+     * fila existente sigue significando exactamente lo mismo.
+     */
+    channel: text("channel", { enum: ["whatsapp", "instagram"] })
+      .notNull()
+      .default("whatsapp"),
+    /**
+     * Llave de resolucion. WhatsApp: telefono normalizado (521 a 52) o
+     * `bsuid:<id>`. Instagram (014): `ig:<IGSID>`. Estable de por vida.
+     * El nombre `wa_identity` se conserva porque es contrato publicado:
+     * `/api/bot/context?waIdentity=...` lo recibe y lo devuelve, y hay
+     * cerebros externos que dependen de el.
+     */
     waIdentity: text("wa_identity").notNull(),
     /** Teléfono como ATRIBUTO opcional (003): falta en contactos BSUID. */
     phone: text("phone"),
@@ -145,7 +159,13 @@ export const contact = pgTable(
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
   (t) => [
-    uniqueIndex("contact_org_wa_identity_uq").on(t.organizationId, t.waIdentity),
+    // 014: el canal entra en la llave. Sin el, un IGSID que coincidiera con
+    // un telefono normalizado mezclaria dos personas en silencio.
+    uniqueIndex("contact_org_channel_identity_uq").on(
+      t.organizationId,
+      t.channel,
+      t.waIdentity
+    ),
     index("contact_org_wa_user_id_idx").on(t.organizationId, t.waUserId),
     index("contact_org_name_idx").on(t.organizationId, t.name),
   ]
@@ -306,6 +326,19 @@ export const conversation = pgTable(
       .references(() => contact.id, { onDelete: "cascade" }),
     /** Conversación del Laboratorio: jamás toca la API de WhatsApp. */
     isTest: boolean("is_test").notNull().default(false),
+    /**
+     * 014: canal de la conversacion. Denormalizado del contacto a proposito:
+     * el ruteo de salida y el filtro de la bandeja lo leen en cada mensaje.
+     */
+    channel: text("channel", { enum: ["whatsapp", "instagram"] })
+      .notNull()
+      .default("whatsapp"),
+    /**
+     * 014: identificador del hilo en la plataforma de origen. Zernio entrega
+     * un conversationId opaco ("no asumas su formato") que hace falta para
+     * responder; WhatsApp no lo necesita y queda null.
+     */
+    channelThreadRef: text("channel_thread_ref"),
     aiEnabled: boolean("ai_enabled").notNull().default(true),
     handoffAt: timestamp("handoff_at"),
     handoffReason: text("handoff_reason", {
@@ -456,6 +489,45 @@ export const metaCredentials = pgTable(
     uniqueIndex("meta_credentials_org_uq").on(t.organizationId),
     // El webhook enruta por phone_number_id: debe ser único en la instancia.
     uniqueIndex("meta_credentials_phone_uq").on(t.phoneNumberId),
+  ]
+);
+
+/**
+ * 014 - Credenciales del canal de Instagram. Tabla explicita (no un jsonb
+ * generico) porque unas credenciales tienen forma fija y conocida: asi
+ * conservan tipado e indices. El token se cifra con los mismos helpers que el
+ * de WhatsApp; un segundo mecanismo de cifrado seria un segundo mecanismo que
+ * auditar.
+ */
+export const instagramCredentials = pgTable(
+  "instagram_credentials",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** De donde vienen los mensajes: API unificada o app propia de Meta. */
+    source: text("source", { enum: ["zernio", "meta"] }).notNull(),
+    /** IG_ID del perfil profesional: por el enruta el webhook. */
+    igUserId: text("ig_user_id").notNull(),
+    /** Zernio: accountId de la cuenta conectada. Meta directo: null. */
+    accountRef: text("account_ref"),
+    username: text("username"),
+    tokenCipher: text("token_cipher").notNull(),
+    tokenIv: text("token_iv").notNull(),
+    tokenTag: text("token_tag").notNull(),
+    /** Secreto HMAC de las entregas (Zernio); null en modo Meta. */
+    webhookSecret: text("webhook_secret"),
+    status: text("status", { enum: ["connected", "reconnect_required"] })
+      .notNull()
+      .default("connected"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("instagram_credentials_org_uq").on(t.organizationId),
+    uniqueIndex("instagram_credentials_ig_user_uq").on(t.igUserId),
+    index("instagram_credentials_account_ref_idx").on(t.accountRef),
   ]
 );
 

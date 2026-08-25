@@ -224,13 +224,24 @@ export function ConversationList({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center justify-between gap-2">
-                        <span
-                          className={cn(
-                            "truncate text-sm",
-                            unread ? "font-[680]" : "font-semibold"
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          {c.channel === "instagram" && (
+                            <span
+                              title="Instagram"
+                              aria-label="Instagram"
+                              className="shrink-0 rounded-[5px] bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] px-1.5 py-[1px] text-[9.5px] font-bold uppercase tracking-wide text-white"
+                            >
+                              IG
+                            </span>
                           )}
-                        >
-                          {c.contact.name}
+                          <span
+                            className={cn(
+                              "truncate text-sm",
+                              unread ? "font-[680]" : "font-semibold"
+                            )}
+                          >
+                            {c.contact.name}
+                          </span>
                         </span>
                         <span
                           className={cn(

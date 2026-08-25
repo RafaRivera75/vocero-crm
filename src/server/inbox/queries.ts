@@ -5,6 +5,8 @@ import { isWindowOpen, windowRemainingMs } from "@/server/inbox/window";
 
 export type ConversationDto = {
   id: string;
+  /** 014: canal de la conversacion, para el distintivo de la bandeja. */
+  channel: "whatsapp" | "instagram";
   contact: { id: string; name: string; phone: string | null };
   stageName: string | null;
   aiEnabled: boolean;
@@ -119,6 +121,7 @@ export function serializeConversation(
 ): ConversationDto {
   return {
     id: c.id,
+    channel: c.channel,
     contact: { id: contact.id, name: contact.name, phone: contact.phone },
     stageName,
     aiEnabled: c.aiEnabled,

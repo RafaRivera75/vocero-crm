@@ -2,6 +2,8 @@
 
 export type ConversationDto = {
   id: string;
+  /** 014: canal de la conversacion, para el distintivo de la bandeja. */
+  channel: "whatsapp" | "instagram";
   contact: { id: string; name: string; phone: string | null };
   stageName: string | null;
   aiEnabled: boolean;
