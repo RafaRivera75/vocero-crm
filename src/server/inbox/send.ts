@@ -155,7 +155,14 @@ async function persistOutbound(input: {
   waMessageId: string | null;
   type: string;
   text: string | null;
-  status: "pending" | "failed";
+  /**
+   * 014: 'sent' existe porque no todos los canales confirman por webhook.
+   * WhatsApp entra como 'pending' y avanza con los `statuses` de Meta;
+   * Instagram no manda ese evento salvo que se suscriba aparte, asi que la
+   * aceptacion de la plataforma ES la confirmacion. Sin esto el mensaje se
+   * queda con el reloj puesto para siempre aunque ya se haya entregado.
+   */
+  status: "pending" | "sent" | "failed";
   error?: string | null;
   aiGenerated?: boolean;
   origin: "ai" | "operator";
@@ -223,7 +230,9 @@ export async function sendText(input: {
     waMessageId,
     type: "text",
     text: input.text,
-    status: "pending",
+    // Instagram no reporta entrega por este webhook: si la plataforma acepto
+    // el mensaje, esta enviado. WhatsApp sigue avanzando por sus statuses.
+    status: target.instagram ? "sent" : "pending",
     aiGenerated: input.aiGenerated,
     origin: input.aiGenerated ? "ai" : "operator",
   });
