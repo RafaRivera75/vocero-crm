@@ -1,4 +1,4 @@
-import type { Channel } from "@/server/inbox/identity";
+import { CHANNEL_LABEL, type Channel } from "@/lib/channels";
 
 /**
  * 014 — Capacidades declaradas por canal.
@@ -44,7 +44,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const CHANNEL_CAPABILITIES: Record<Channel, ChannelCapabilities> = {
   whatsapp: {
-    label: "WhatsApp",
+    label: CHANNEL_LABEL.whatsapp,
     windowMs: DAY_MS,
     outsideWindow: "template",
     maxTextBytes: null,
@@ -52,7 +52,7 @@ export const CHANNEL_CAPABILITIES: Record<Channel, ChannelCapabilities> = {
     deliveryReceipts: true,
   },
   instagram: {
-    label: "Instagram",
+    label: CHANNEL_LABEL.instagram,
     windowMs: DAY_MS,
     outsideWindow: "human_agent_tag",
     // Meta corta en 1000 bytes: con acentos y emojis el margen real es menor

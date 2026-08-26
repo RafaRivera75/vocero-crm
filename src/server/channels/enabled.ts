@@ -1,5 +1,5 @@
 import { getEnv } from "@/lib/env";
-import type { Channel } from "@/server/inbox/identity";
+import { isChannel, type Channel } from "@/lib/channels";
 
 /**
  * 014 — Qué canales están encendidos en esta instancia.
@@ -22,11 +22,13 @@ import type { Channel } from "@/server/inbox/identity";
 /** WhatsApp no se puede apagar: es el canal por el que existe el producto. */
 const ALWAYS_ON: Channel = "whatsapp";
 
-function parseChannels(raw: string | undefined): Set<Channel> {
+export function parseChannels(raw: string | undefined): Set<Channel> {
   const enabled = new Set<Channel>([ALWAYS_ON]);
   for (const part of (raw ?? "").split(",")) {
     const name = part.trim().toLowerCase();
-    if (name === "instagram") enabled.add("instagram");
+    // Cualquier canal del catalogo, no una lista escrita a mano aqui: el
+    // canal siguiente solo tiene que existir en lib/channels.ts.
+    if (isChannel(name)) enabled.add(name);
   }
   return enabled;
 }

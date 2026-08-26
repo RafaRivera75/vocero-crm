@@ -1,4 +1,5 @@
 import { and, eq, or } from "drizzle-orm";
+import type { Channel } from "@/lib/channels";
 import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { normalizeMx } from "@/lib/meta/client";
@@ -18,7 +19,9 @@ export const BSUID_PREFIX = "bsuid:";
 /** 014: identidad de Instagram, analoga al BSUID de WhatsApp. */
 export const IG_PREFIX = "ig:";
 
-export type Channel = "whatsapp" | "instagram";
+// El tipo vive en lib/ porque la interfaz tambien lo necesita; se reexporta
+// aqui para no tocar a quien ya lo importaba de este modulo.
+export type { Channel };
 
 export type ResolvedIdentity = {
   /** Llave estable de resolución: teléfono normalizado o `bsuid:<id>`. */
