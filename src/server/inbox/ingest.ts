@@ -162,12 +162,19 @@ export async function getOrCreateContact(
 
 export async function getOrCreateConversation(
   organizationId: string,
-  contactId: string
+  contactId: string,
+  opts?: { channel?: "whatsapp" | "instagram"; threadRef?: string | null }
 ) {
   const db = getDb();
   const inserted = await db
     .insert(schema.conversation)
-    .values({ id: newId("conversation"), organizationId, contactId })
+    .values({
+      id: newId("conversation"),
+      organizationId,
+      contactId,
+      channel: opts?.channel ?? "whatsapp",
+      channelThreadRef: opts?.threadRef ?? null,
+    })
     .onConflictDoNothing()
     .returning();
   if (inserted[0]) return inserted[0];
@@ -185,6 +192,15 @@ export async function getOrCreateConversation(
     .limit(1);
   const existing = rows[0];
   if (!existing) throw new Error("conversación no encontrada tras upsert");
+  // 014: el hilo de la plataforma puede aparecer despues (o cambiar); se
+  // guarda en cuanto se conoce para poder responder.
+  if (opts?.threadRef && existing.channelThreadRef !== opts.threadRef) {
+    await db
+      .update(schema.conversation)
+      .set({ channelThreadRef: opts.threadRef, updatedAt: new Date() })
+      .where(eq(schema.conversation.id, existing.id));
+    existing.channelThreadRef = opts.threadRef;
+  }
   return existing;
 }
 
@@ -363,6 +379,8 @@ export async function ingestInboundMessage(input: {
   text: string | null;
   timestamp: string;
   media?: MediaInput | null;
+  /** 014: hilo en la plataforma de origen (Zernio); null en WhatsApp. */
+  threadRef?: string | null;
 }): Promise<void> {
   const db = getDb();
   const { organizationId } = input;
@@ -373,7 +391,8 @@ export async function ingestInboundMessage(input: {
   );
   const conversation = await getOrCreateConversation(
     organizationId,
-    contact.id
+    contact.id,
+    { channel: contact.channel, threadRef: input.threadRef ?? null }
   );
 
   const waTimestamp = toDate(input.timestamp);
