@@ -7,6 +7,10 @@ import {
   processZernioEvent,
   resolveZernioSecret,
 } from "@/server/instagram/ingest";
+import {
+  channelDisabledResponse,
+  isChannelEnabled,
+} from "@/server/channels/enabled";
 
 /**
  * 014 — Webhook público del canal de Instagram.
@@ -22,6 +26,7 @@ export const dynamic = "force-dynamic";
 type Params = { params: Promise<{ webhookToken: string }> };
 
 export async function GET(req: Request, { params }: Params) {
+  if (!isChannelEnabled("instagram")) return channelDisabledResponse();
   const { webhookToken } = await params;
   const env = getEnv();
   if (!isValidWebhookToken(webhookToken, env.META_WEBHOOK_VERIFY_TOKEN)) {
@@ -41,6 +46,7 @@ export async function GET(req: Request, { params }: Params) {
 }
 
 export async function POST(req: Request, { params }: Params) {
+  if (!isChannelEnabled("instagram")) return channelDisabledResponse();
   const { webhookToken } = await params;
   const env = getEnv();
   if (!isValidWebhookToken(webhookToken, env.META_WEBHOOK_VERIFY_TOKEN)) {

@@ -21,6 +21,7 @@ import {
   textFits,
   windowClosedMessage,
 } from "@/server/channels/capabilities";
+import { isChannelEnabled } from "@/server/channels/enabled";
 import { serializeMessage } from "@/server/inbox/ingest";
 import {
   saveMediaFile,
@@ -97,6 +98,14 @@ async function prepareSend(
   // plantillas. Se resuelve antes que las credenciales de WhatsApp para no
   // exigirle a una instancia de solo-Instagram un numero conectado.
   if (row.conversation.channel === "instagram") {
+    // Una conversacion de un canal apagado puede existir (se apago despues de
+    // recibirla): falla claro en vez de intentar un transporte que no aplica.
+    if (!isChannelEnabled("instagram")) {
+      throw new SendError(
+        "not_connected",
+        "El canal de Instagram está desactivado en esta instancia"
+      );
+    }
     const igCreds = await getInstagramCredentialsByOrg(organizationId);
     if (!igCreds) {
       throw new SendError(

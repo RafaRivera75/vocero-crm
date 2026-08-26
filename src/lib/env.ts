@@ -26,6 +26,10 @@ const envSchema = z.object({
   OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api"),
   OPENROUTER_MODEL: z.string().optional(),
   OPENROUTER_JUDGE_MODEL: z.string().optional(),
+  // 014: canales encendidos, separados por coma. WhatsApp siempre esta on.
+  // Ej.: CHANNELS=whatsapp,instagram. Sin ella, la instancia es solo WhatsApp
+  // y las superficies de los demas canales responden 404.
+  CHANNELS: z.string().optional(),
   ALLOW_SIGNUP: z.string().optional(),
   AGENT_COALESCE_MS: z.coerce.number().int().min(0).default(6000),
   WA_MOCK_ENABLED: z.string().optional(),
