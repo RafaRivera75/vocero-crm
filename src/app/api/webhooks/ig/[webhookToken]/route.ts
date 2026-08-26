@@ -1,6 +1,6 @@
 import { after } from "next/server";
 import { getEnv } from "@/lib/env";
-import { isValidWebhookToken } from "@/server/inbox/webhook";
+import { isValidSignature, isValidWebhookToken } from "@/server/inbox/webhook";
 import {
   isValidZernioSignature,
   processMetaInstagramPayload,
@@ -62,7 +62,15 @@ export async function POST(req: Request, { params }: Params) {
     payload !== null &&
     (payload as { object?: string }).object === "instagram";
 
-  if (!isMeta) {
+  if (isMeta) {
+    // Meta firma cada entrega con el App Secret, igual que en WhatsApp. Sin
+    // esta capa, quien conozca la URL secreta puede inyectar DMs falsos: el
+    // agente los contestaria enviando un DM REAL desde la cuenta del cliente
+    // al destinatario que el atacante elija.
+    if (!isValidSignature(rawBody, req.headers.get("x-hub-signature-256"), env.META_APP_SECRET)) {
+      return new Response(null, { status: 401 });
+    }
+  } else {
     // Zernio: la firma se valida contra el secreto de ESTA cuenta, que hay que
     // resolver leyendo el cuerpo primero.
     const { secret } = await resolveZernioSecret(rawBody);
