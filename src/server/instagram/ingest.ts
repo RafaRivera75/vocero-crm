@@ -84,6 +84,15 @@ export async function processZernioEvent(payload: unknown): Promise<void> {
     );
     return;
   }
+  if (creds.source !== "zernio") {
+    // Defensa en profundidad: esta instancia no habla con Zernio, asi que un
+    // payload con su forma no puede ser legitimo aunque llegue por la URL
+    // correcta. Sin esto, la unica barrera de la forma ajena es la URL.
+    console.warn(
+      `[ig] payload de Zernio en una instancia configurada como '${creds.source}': descartado`
+    );
+    return;
+  }
 
   const igsid = evt.message?.sender?.id;
   if (!igsid) {
@@ -154,6 +163,15 @@ export async function processMetaInstagramPayload(
       console.warn(
         `[ig] evento para IG_ID desconocido (${igUserId}): ` +
           "guarda la conexion en Configuracion -> Instagram para recibir mensajes"
+      );
+      continue;
+    }
+    if (creds.source !== "meta") {
+      // Idem: sin app propia de Meta, un payload con su forma no puede venir
+      // de Meta. Cierra la inyeccion en instancias que solo usan Zernio, donde
+      // META_APP_SECRET no existe y la firma no se puede verificar.
+      console.warn(
+        `[ig] payload de Meta en una instancia configurada como '${creds.source}': descartado`
       );
       continue;
     }

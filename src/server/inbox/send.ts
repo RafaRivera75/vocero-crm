@@ -15,7 +15,12 @@ import {
   markInstagramReconnectRequired,
   type InstagramCredentials,
 } from "@/server/instagram/credentials";
-import { fitsInstagramText, sendInstagramText } from "@/server/instagram/send";
+import { sendInstagramText } from "@/server/instagram/send";
+import {
+  capabilitiesFor,
+  textFits,
+  windowClosedMessage,
+} from "@/server/channels/capabilities";
 import { serializeMessage } from "@/server/inbox/ingest";
 import {
   saveMediaFile,
@@ -116,10 +121,18 @@ async function prepareSend(
     };
   }
 
-  if (!isWindowOpen(row.conversation.lastInboundAt)) {
+  // El nucleo no decide la politica: la consulta. WhatsApp exige plantilla
+  // fuera de ventana; Instagram etiqueta y sigue; otro canal podria no tener
+  // ventana en absoluto.
+  const caps = capabilitiesFor(row.conversation.channel);
+  if (
+    caps.windowMs !== null &&
+    caps.outsideWindow === "template" &&
+    !isWindowOpen(row.conversation.lastInboundAt)
+  ) {
     throw new SendError(
       "window_closed",
-      "La ventana de 24 horas está cerrada; usa una plantilla aprobada"
+      windowClosedMessage(row.conversation.channel)
     );
   }
 
@@ -230,9 +243,12 @@ export async function sendText(input: {
     waMessageId,
     type: "text",
     text: input.text,
-    // Instagram no reporta entrega por este webhook: si la plataforma acepto
-    // el mensaje, esta enviado. WhatsApp sigue avanzando por sus statuses.
-    status: target.instagram ? "sent" : "pending",
+    // Un canal sin acuses de entrega confirma al aceptar; uno con acuses
+    // avanza despues por webhook. Sin esta distincion el mensaje se queda
+    // con el reloj puesto para siempre.
+    status: capabilitiesFor(target.conversation.channel).deliveryReceipts
+      ? "pending"
+      : "sent",
     aiGenerated: input.aiGenerated,
     origin: input.aiGenerated ? "ai" : "operator",
   });
@@ -257,12 +273,11 @@ export async function sendMediaMessage(input: {
 
   const target = await prepareSend(input.conversationId, input.organizationId);
   const { credentials, recipient } = target;
-  if (target.instagram) {
-    // 014 fuera de alcance: adjuntos salientes en Instagram. Fallar claro es
-    // mejor que mandarlo por el transporte equivocado.
+  const sendCaps = capabilitiesFor(target.conversation.channel);
+  if (!sendCaps.outboundMedia) {
     throw new SendError(
       "meta_error",
-      "Todavía no se pueden enviar adjuntos por Instagram; manda el texto"
+      `Todavía no se pueden enviar adjuntos por ${sendCaps.label}; manda el texto`
     );
   }
 
@@ -465,10 +480,11 @@ async function callInstagramSend(
 ): Promise<string> {
   const creds = target.instagram!;
 
-  if (!fitsInstagramText(text)) {
+  const caps = capabilitiesFor("instagram");
+  if (!textFits("instagram", text)) {
     throw new SendError(
       "meta_error",
-      "Instagram no acepta mensajes de más de 1000 bytes: acorta el texto"
+      `${caps.label} no acepta mensajes de más de ${caps.maxTextBytes} bytes: acorta el texto`
     );
   }
 

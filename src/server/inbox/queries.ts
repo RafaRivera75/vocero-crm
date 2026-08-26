@@ -2,23 +2,7 @@ import { and, desc, eq, gt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { isWindowOpen, windowRemainingMs } from "@/server/inbox/window";
-
-export type ConversationDto = {
-  id: string;
-  /** 014: canal de la conversacion, para el distintivo de la bandeja. */
-  channel: "whatsapp" | "instagram";
-  contact: { id: string; name: string; phone: string | null };
-  stageName: string | null;
-  aiEnabled: boolean;
-  handoffAt: string | null;
-  handoffReason: string | null;
-  lastInboundAt: string | null;
-  lastMessageAt: string | null;
-  unreadCount: number;
-  windowOpen: boolean;
-  windowRemainingMs: number;
-  preview: string | null;
-};
+import type { ConversationDto } from "@/lib/types";
 
 export async function listConversations(
   organizationId: string,
