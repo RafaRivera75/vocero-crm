@@ -179,10 +179,28 @@ configurable (default `primary`). Scope: `…/auth/calendar.events`.
   [Google Cloud — Manage App Audience](https://support.google.com/cloud/answer/15549945?hl=en),
   [Using OAuth 2.0 to Access Google APIs](https://developers.google.com/identity/protocols/oauth2),
   [resumen del límite de 7 días](https://www.unipile.com/google-oauth-refresh-token/).
-- **NEEDS VERIFICATION (en implementación, Principio VII)**: confirmar contra
-  la API real que `conferenceData.createRequest` responde el link en la
-  creación síncrona (o exige un poll del evento) antes de fijar el contrato de
-  respuesta del adaptador; el mock debe imitar el comportamiento confirmado.
+- **RESUELTO 2026-08-26 (era NEEDS VERIFICATION)**: la conferencia se crea de
+  forma **asíncrona**. La documentación oficial es explícita: *"the immediate
+  response to this call might not yet contain the fully-populated
+  `conferenceData`; the status field contains `pending`"*, y solo cuando pasa a
+  `success` aparecen los `entryPoints` con el enlace. Fuentes:
+  [Create events — Calendar API](https://developers.google.com/workspace/calendar/api/guides/create-events)
+  y la [referencia de events](https://developers.google.com/workspace/calendar/api/v3/reference/events).
+
+  **Consecuencias de diseño, ya aplicadas:**
+  1. El adaptador **re-lee el evento** unas pocas veces tras crearlo, en vez de
+     confiar en la respuesta del insert.
+  2. Si aun así sigue pendiente, la cita se entrega **con el evento creado y
+     sin enlace** (`link_pending`), no se descarta ni se reintenta a ciegas.
+  3. Eso obligó a una operación **opcional** más en el contrato:
+     `refreshMeeting(creds, externalId)`. Sin ella, "Reintentar enlace" sobre
+     una cita que ya tiene evento crearía un evento DUPLICADO en el calendario
+     del dueño. Es opcional: un conector cuyo enlace llega de inmediato (Zoom)
+     no la necesita.
+
+  Esto es exactamente lo que el marcador de trazabilidad existía para evitar:
+  fijar el contrato sobre un supuesto cómodo y descubrir en producción que el
+  proveedor no lo cumple.
 
 ---
 

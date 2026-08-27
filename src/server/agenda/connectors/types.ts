@@ -59,6 +59,18 @@ export type AgendaConnector<Creds> = {
   deleteMeeting(creds: Creds, externalId: string): Promise<void>;
 
   testConnection(creds: Creds): Promise<TestConnectionResult>;
+
+  /**
+   * OPCIONAL: vuelve a leer una reunión ya creada.
+   *
+   * Existe por los proveedores que generan el enlace de forma asíncrona
+   * (Google crea la conferencia en segundo plano y su respuesta inmediata
+   * puede venir `pending`). Sin esto, "Reintentar enlace" sobre una cita que ya
+   * tiene evento crearía un DUPLICADO en el calendario del dueño.
+   *
+   * Un conector cuyo enlace llega de inmediato —Zoom— no la necesita.
+   */
+  refreshMeeting?(creds: Creds, externalId: string): Promise<MeetingResult>;
 };
 
 /**

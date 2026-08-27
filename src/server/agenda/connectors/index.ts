@@ -8,6 +8,16 @@ import {
   type TestConnectionResult,
 } from "@/server/agenda/connectors/types";
 import { enlaceFijoConnector } from "@/server/agenda/connectors/enlace-fijo";
+import { zoomConnector } from "@/server/agenda/connectors/zoom";
+import {
+  getZoomCredentials,
+  markZoomError,
+} from "@/server/agenda/connectors/zoom-credentials";
+import { googleConnector } from "@/server/agenda/connectors/google";
+import {
+  getGoogleCredentials,
+  markGoogleError,
+} from "@/server/agenda/connectors/google-credentials";
 
 /**
  * 015 — El catálogo de conectores y la ÚNICA puerta por la que el motor habla
@@ -29,9 +39,12 @@ export type BoundConnector = {
   ): Promise<void>;
   deleteMeeting(externalId: string): Promise<void>;
   testConnection(): Promise<TestConnectionResult>;
+  /** Solo si el conector la implementa (enlaces asíncronos). */
+  refreshMeeting?: (externalId: string) => Promise<MeetingResult>;
 };
 
 function bind<C>(conn: AgendaConnector<C>, creds: C): BoundConnector {
+  const refresh = conn.refreshMeeting;
   return {
     id: conn.id,
     createMeeting: (req) => conn.createMeeting(creds, req),
@@ -39,6 +52,9 @@ function bind<C>(conn: AgendaConnector<C>, creds: C): BoundConnector {
       conn.updateMeeting(creds, externalId, req),
     deleteMeeting: (externalId) => conn.deleteMeeting(creds, externalId),
     testConnection: () => conn.testConnection(creds),
+    refreshMeeting: refresh
+      ? (externalId) => refresh.call(conn, creds, externalId)
+      : undefined,
   };
 }
 
@@ -59,13 +75,27 @@ export async function bindConnector(
     case "enlace-fijo":
       return bind(enlaceFijoConnector, { meetingLink: settings.meetingLink });
 
-    case "zoom":
-    case "google":
-      // Se registran en sus fases (US5 / US6).
-      throw new ConnectorError(
-        connectorId,
-        `El conector ${connectorId} no está disponible en esta instalación`
-      );
+    case "zoom": {
+      const creds = await getZoomCredentials(organizationId);
+      if (!creds) {
+        throw new ConnectorError(
+          "zoom",
+          "Zoom no está conectado: faltan las credenciales"
+        );
+      }
+      return bind(zoomConnector, creds);
+    }
+
+    case "google": {
+      const creds = await getGoogleCredentials(organizationId);
+      if (!creds) {
+        throw new ConnectorError(
+          "google",
+          "Google no está conectado: faltan las credenciales"
+        );
+      }
+      return bind(googleConnector, creds);
+    }
   }
 }
 
@@ -86,8 +116,10 @@ export async function markConnectorAuthError(
     case "enlace-fijo":
       return;
     case "zoom":
+      await markZoomError(organizationId);
+      return;
     case "google":
-      // Se implementa junto a su tabla de credenciales (US5 / US6).
+      await markGoogleError(organizationId);
       return;
   }
 }

@@ -3,7 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { newId } from "@/lib/db/ids";
 import { scoped } from "@/lib/db/tenant";
 import { labelInTz } from "@/lib/time/slots";
-import type { ConnectorId } from "@/lib/agenda-connectors";
+import { CONNECTOR_META, type ConnectorId } from "@/lib/agenda-connectors";
 import {
   computeAvailability,
   findSlot,
@@ -522,17 +522,28 @@ async function deliverMeeting(
       connectorId,
       settings
     );
-    const meeting = await conn.createMeeting({
-      topic: contactName ? `Cita — ${contactName}` : "Cita",
-      startUtc: booking.scheduledAt.toISOString(),
-      durationMinutes: booking.durationMinutes,
-      timezone: settings.timezone,
-      notes: booking.notes ?? undefined,
-    });
+
+    // Si la cita YA tiene reunión, esto es un reintento: se vuelve a leer, no
+    // se crea otra. Sin esta rama, reintentar el enlace de un evento de Google
+    // dejaría al dueño con dos citas en su calendario.
+    const meeting =
+      booking.externalRef && conn.refreshMeeting
+        ? await conn.refreshMeeting(booking.externalRef)
+        : await conn.createMeeting({
+            topic: contactName ? `Cita — ${contactName}` : "Cita",
+            startUtc: booking.scheduledAt.toISOString(),
+            durationMinutes: booking.durationMinutes,
+            timezone: settings.timezone,
+            notes: booking.notes ?? undefined,
+          });
+
     return await persistDelivery(booking.id, {
-      externalRef: meeting.externalId,
+      externalRef: meeting.externalId ?? booking.externalRef,
       meetingLink: meeting.joinUrl,
-      linkPending: false,
+      // Un conector que promete enlace por cita y no lo trajo todavía deja la
+      // cita "sin enlace" — reintentable. `enlace-fijo` sin sala configurada,
+      // en cambio, no tiene nada pendiente: simplemente no hay enlace.
+      linkPending: CONNECTOR_META[connectorId].perBookingLink && !meeting.joinUrl,
     });
   } catch (err) {
     console.warn(
@@ -543,9 +554,11 @@ async function deliverMeeting(
         () => {}
       );
     }
-    // La cita ya existe y se queda: el enlace es lo único que falta.
+    // La cita ya existe y se queda: el enlace es lo único que falta. Se
+    // conserva la referencia externa si ya la había, para que el reintento
+    // sepa que no debe crear otra reunión.
     return await persistDelivery(booking.id, {
-      externalRef: null,
+      externalRef: booking.externalRef,
       meetingLink: null,
       linkPending: true,
     });

@@ -269,33 +269,33 @@ manejable.
 borrar reunión, credencial inválida no persiste, 401 marca error visible,
 scopes completos documentados.
 
-- [ ] T040 [US5] Crear `src/server/agenda/connectors/zoom.ts`: token S2S
+- [X] T040 [US5] Crear `src/server/agenda/connectors/zoom.ts`: token S2S
       (`grant_type=account_credentials`, `Basic`), caché en memoria con
       expiración anticipada 60 s e invalidación al cambiar credenciales;
       `createMeeting` (`type:2`, start UTC sin milisegundos, settings
       `join_before_host`/sin waiting room), `updateMeeting` (mismo id ⇒ mismo
       link), `deleteMeeting` (404 tolerado), `testConnection` (`GET /users/me`);
       error de auth tipado para que el motor marque la credencial
-- [ ] T041 [US5] Crear `src/server/agenda/connectors/zoom-credentials.ts`:
+- [X] T041 [US5] Crear `src/server/agenda/connectors/zoom-credentials.ts`:
       cifrado con `src/lib/crypto` (secret cipher/iv/tag), `last4`, upsert que
       invalida la caché de token, `markError` — y el estado `error` SE ESCRIBE
       (en el fork es un enum decorativo; research D5)
-- [ ] T042 [US5] Crear `src/app/api/settings/zoom/route.ts` (GET forma pública
+- [X] T042 [US5] Crear `src/app/api/settings/zoom/route.ts` (GET forma pública
       con `secretLast4`+`status`; PUT valida contra el proveedor ANTES de
       persistir → `422 zoom_invalid`; DELETE desconecta) y
       `src/app/api/settings/zoom/test/route.ts` (probar sin guardar) — bandera
       →404, molde de `/api/settings/whatsapp`
-- [ ] T043 [US5] Sección de credenciales Zoom en
+- [X] T043 [US5] Sección de credenciales Zoom en
       `src/components/settings/agenda-client.tsx`: tres campos, botón Probar,
       `…last4`, tarjeta roja de reconexión si `status="error"`, y la guía de
       los CUATRO scopes granulares incluido `user:read:user` (la guía del fork
       lo omite y la validación fallaría — research D5)
-- [ ] T044 [P] [US5] Crear el mock: `src/app/api/dev/zoom-mock/[...path]/route.ts`
+- [X] T044 [P] [US5] Crear el mock: `src/app/api/dev/zoom-mock/[...path]/route.ts`
       + `src/server/dev/zoom-mock-state.ts` tras `mockGuard()` (404 en
       producción): `oauth/token`, `users/me/meetings` CRUD, `users/me`,
       `_state`/`_reset`, y camino infeliz determinista (client secret terminado
       en `-invalid` → 400) — molde del zoom-mock del fork
-- [ ] T045 [US5] Crear `tests/unit/connectors.test.ts`: suite de contrato
+- [X] T045 [US5] Crear `tests/unit/connectors.test.ts`: suite de contrato
       COMPARTIDA parametrizada por conector (enlace-fijo + zoom): las 4
       operaciones, 404-tolerancia del delete, y el mapeo fallo→`link_pending` /
       auth→`status error` en el servicio
@@ -318,29 +318,29 @@ D6). Recortable sin romper la feature.
 **Independent Test**: escenarios 1-4 de US6 contra el google-mock; guía con la
 advertencia de "En producción".
 
-- [ ] T047 [US6] Resolver el NEEDS VERIFICATION de research D6: confirmar
+- [X] T047 [US6] Resolver el NEEDS VERIFICATION de research D6: confirmar
       (documentación oficial de Calendar API y, si hay credenciales de prueba,
       llamada real) si `events.insert` con `conferenceDataVersion=1` devuelve
       el link de Meet en la respuesta síncrona o exige releer el evento; fijar
       el contrato del adaptador y el comportamiento del mock según lo
       confirmado; registrar el hallazgo en
       `specs/015-motor-agenda-universal/research.md`
-- [ ] T048 [US6] Crear `src/server/agenda/connectors/google.ts`: refresh→access
+- [X] T048 [US6] Crear `src/server/agenda/connectors/google.ts`: refresh→access
       token (`oauth2.googleapis.com/token`) con caché; `createMeeting` (evento
       + `conferenceData.createRequest`), `updateMeeting` (patch de fechas),
       `deleteMeeting` (404 tolerado), `testConnection` (GET del calendario);
       scope `…/auth/calendar.events`
-- [ ] T049 [US6] Crear `src/server/agenda/connectors/google-credentials.ts`:
+- [X] T049 [US6] Crear `src/server/agenda/connectors/google-credentials.ts`:
       DOS secretos cifrados (client secret + refresh token), `calendar_id`
       default `primary`, `last4`, `markError`
-- [ ] T050 [US6] Crear `src/app/api/settings/google/route.ts` + `test/route.ts`
+- [X] T050 [US6] Crear `src/app/api/settings/google/route.ts` + `test/route.ts`
       (mismo molde que Zoom; `422 google_invalid`)
-- [ ] T051 [US6] Sección de credenciales Google en
+- [X] T051 [US6] Sección de credenciales Google en
       `src/components/settings/agenda-client.tsx` con la advertencia en
       negritas: la app OAuth del negocio debe estar "En producción" — en
       "Testing" Google revoca el refresh token a los 7 días y la integración
       muere en silencio (research D6)
-- [ ] T052 [P] [US6] Crear el mock: `src/app/api/dev/google-mock/[...path]/route.ts`
+- [X] T052 [P] [US6] Crear el mock: `src/app/api/dev/google-mock/[...path]/route.ts`
       + `src/server/dev/google-mock-state.ts` (`token`, events CRUD con link de
       Meet según T047, `_state`/`_reset`, refresh token `-invalid` → 400
       `invalid_grant`)
