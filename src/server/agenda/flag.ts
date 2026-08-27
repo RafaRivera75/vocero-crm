@@ -1,5 +1,3 @@
-import { getEnv } from "@/lib/env";
-
 /**
  * 015 — Si esta instancia tiene agenda o no.
  *
@@ -30,8 +28,17 @@ export function parseAgendaFlag(raw: string | undefined): boolean {
   return ON_VALUES.has((raw ?? "").trim().toLowerCase());
 }
 
+/**
+ * Se lee de `process.env` directo, no por `getEnv()`, igual que
+ * `isMockEnabled()` e `isAiConfigured()`: preguntar si una feature existe no
+ * puede depender de que TODO el entorno valide. Con `getEnv()`, un turno del
+ * agente reventaba —en vez de degradar— solo por consultar la bandera.
+ *
+ * `AGENDA` sí está declarada en el esquema de `lib/env.ts`: ahí vive su
+ * documentación y su tipo. Lo que no pasa por el validador es esta consulta.
+ */
 export function agendaEnabled(): boolean {
-  return parseAgendaFlag(getEnv().AGENDA);
+  return parseAgendaFlag(process.env.AGENDA);
 }
 
 /**

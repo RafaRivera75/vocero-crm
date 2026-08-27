@@ -131,20 +131,20 @@ FR-003, FR-004).
 **Independent Test**: escenarios 1-3 y 6 de US2 del spec: defaults con 200,
 huecos correctos con etiqueta con día, DST correcto, enlace fijo opcional.
 
-- [ ] T019 [US2] Crear `src/app/api/calendar/settings/route.ts` GET/PUT según
+- [X] T019 [US2] Crear `src/app/api/calendar/settings/route.ts` GET/PUT según
       contracts/agenda.md (primera línea: `agendaDisabledResponse()` si la
       bandera está apagada; zod; clamps; 422 por timezone/connector inválidos;
       jamás credenciales en la respuesta)
-- [ ] T020 [US2] Crear `src/app/api/calendar/availability/route.ts` GET
+- [X] T020 [US2] Crear `src/app/api/calendar/availability/route.ts` GET
       (`from`/`to`, vista del operador, NO registra oferta, `{"slots":[]}` con
       200 cuando no hay)
-- [ ] T021 [US2] Crear `src/app/(app)/settings/calendar/page.tsx` +
+- [X] T021 [US2] Crear `src/app/(app)/settings/calendar/page.tsx` +
       `src/components/settings/agenda-client.tsx`: editor de horario semanal,
       duración/respiro/aviso/ventana, zona horaria, selector de conector desde
       el catálogo (con sus capacidades como descripción), campo de enlace fijo,
       y aviso visible si se elige un conector externo sin credenciales
       configuradas
-- [ ] T022 [US2] Agregar la pestaña "Agenda" (`/settings/calendar`) a `TABS` en
+- [X] T022 [US2] Agregar la pestaña "Agenda" (`/settings/calendar`) a `TABS` en
       `src/components/settings/settings-nav.tsx`, renderizada solo con la prop
       de bandera encendida (T016)
 - [ ] T023 [US2] Crear el guion `tests/e2e/us-agenda.md` (historias US1+US2) y
@@ -167,12 +167,12 @@ acciones del agente (FR-005..FR-012).
 carrera → `slot_taken` con alternativas frescas, reprogramación por bot,
 sandbox, agente incluido.
 
-- [ ] T024 [US3] Crear `src/server/agenda/offers.ts`: reemplazo completo
+- [X] T024 [US3] Crear `src/server/agenda/offers.ts`: reemplazo completo
       transaccional de `offered_slot` por conversación, lectura y limpieza
       (portado de la cantera)
-- [ ] T025 [P] [US3] Crear `tests/unit/offers.test.ts` (reemplazo, limpieza al
+- [X] T025 [P] [US3] Crear `tests/unit/offers.test.ts` (reemplazo, limpieza al
       reservar, cascade con la conversación)
-- [ ] T026 [US3] Crear `src/server/agenda/service.ts` —
+- [X] T026 [US3] Crear `src/server/agenda/service.ts` —
       `createSessionBooking`: exige instante ofrecido a ESA conversación (epoch
       exacto → `slot_not_offered` + lo ofrecido); re-valida con `findSlot` →
       `slot_taken` + alternativas frescas re-registradas como nueva oferta;
@@ -183,28 +183,28 @@ sandbox, agente incluido.
       conector**; avance del lead solo-adelante por la puerta única
       `src/server/leads/stage-history.ts` en try/catch (un fallo no impide la
       cita); etiqueta con día en palabras
-- [ ] T027 [US3] Completar `src/server/agenda/service.ts` — reprogramar
+- [X] T027 [US3] Completar `src/server/agenda/service.ts` — reprogramar
       (excluye la propia cita; `updateMeeting` sobre el MISMO `external_ref`,
       conserva link; `reminder` no aplica: fuera de v1), cancelar (idempotente;
       `deleteMeeting` con 404=éxito; cancelada no se reprograma → 422), marcar
       realizada/no_show, y crear bloqueos — el guard de `is_test` simétrico en
       las TRES mutaciones (FR-017)
-- [ ] T028 [P] [US3] Crear `tests/unit/booking-race.test.ts`: dos confirmaciones
+- [X] T028 [P] [US3] Crear `tests/unit/booking-race.test.ts`: dos confirmaciones
       del mismo instante — una gana, la otra recibe `slot_taken` mapeado del
       unique-violation; jamás dos citas activas reales en el mismo epoch
-- [ ] T029 [US3] Crear `src/app/api/bot/availability/route.ts`: bandera→404,
+- [X] T029 [US3] Crear `src/app/api/bot/availability/route.ts`: bandera→404,
       `requireBotKey`, registra la oferta (T024), clamps `limit` 1-48 default
       12 / `perDay` 1-8 / `days` 1-14, respuesta con `diasConAgenda`
       (contracts/agenda.md); `export const dynamic = "force-dynamic"`
-- [ ] T030 [US3] Crear `src/app/api/bot/bookings/route.ts`: POST → **201**
+- [X] T030 [US3] Crear `src/app/api/bot/bookings/route.ts`: POST → **201**
       `{bookingId, meetingLink, linkPending, label}` / 409 con sobre ANIDADO +
       `slots` hermano / 404 / 422; PATCH → **200** reprograma la próxima cita
       activa de la conversación bajo las mismas reglas de oferta (sin cancel:
       esa la decide el dueño — handoff)
-- [ ] T031 [US3] Extender `tests/unit/bot-gateway.test.ts`: 404 con bandera
+- [X] T031 [US3] Extender `tests/unit/bot-gateway.test.ts`: 404 con bandera
       apagada, 401 sin llave, y la FORMA exacta de 201/409 (los mocks del fork
       divergieron del contrato real y costó un outage — research D9)
-- [ ] T032 [US3] Agregar `offer_slots {reply?}` y `book_slot {startUtc, reply?}`
+- [X] T032 [US3] Agregar `offer_slots {reply?}` y `book_slot {startUtc, reply?}`
       a la unión de `src/server/ai/actions.ts` SOLO con bandera encendida, la
       sección condicional del prompt en `src/server/ai/prompts.ts` (apagada = 0
       tokens) y la ejecución en `src/server/ai/pipeline.ts` con degradación (el
@@ -230,24 +230,24 @@ sandbox, agente incluido.
 cancelar idempotente, bloquear, reintentar enlace (el e2e del reintento se
 completa en US5, que introduce el primer conector que puede fallar).
 
-- [ ] T034 [US4] Crear `src/server/agenda/queries.ts`: listado con
+- [X] T034 [US4] Crear `src/server/agenda/queries.ts`: listado con
       fecha/hora/día en zona del negocio, contacto, origen, estado, `connector`,
       `meetingLink`, `linkPending`, `isTest`
-- [ ] T035 [US4] Crear `src/app/api/bookings/route.ts` (GET; POST **201** con
+- [X] T035 [US4] Crear `src/app/api/bookings/route.ts` (GET; POST **201** con
       unión discriminada `session|block`, 409/422) y
       `src/app/api/bookings/[id]/route.ts` (PATCH
       `reschedule`/`cancel`/`status`/`retry_link` según contracts/agenda.md)
-- [ ] T036 [US4] Implementar `retry_link` en `src/server/agenda/service.ts`:
+- [X] T036 [US4] Implementar `retry_link` en `src/server/agenda/service.ts`:
       re-invoca `createMeeting` contra el conector de ORIGEN de la cita
       (`booking.connector`, no el activo); éxito escribe
       `external_ref`/`meeting_link` y limpia `link_pending`; 422 si no había
       pendiente
-- [ ] T037 [US4] Crear `src/app/(app)/bookings/page.tsx` +
+- [X] T037 [US4] Crear `src/app/(app)/bookings/page.tsx` +
       `src/components/bookings/bookings-client.tsx`: lista, acciones
       (reprogramar con huecos disponibles, cancelar, realizada/no_show), crear
       bloqueo, distintivo de prueba, y botón "Reintentar enlace" cuando
       `linkPending`
-- [ ] T038 [US4] Agregar la entrada "Citas" (`/bookings`, icono de calendario
+- [X] T038 [US4] Agregar la entrada "Citas" (`/bookings`, icono de calendario
       de lucide-react) a `NAV` en `src/components/app-nav.tsx`, renderizada
       solo con la prop de bandera (T016)
 - [ ] T039 [US4] Sección "agenda: operador" en `scripts/e2e-selftest.mjs` +

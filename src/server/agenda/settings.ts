@@ -99,9 +99,22 @@ export class CalendarSettingsError extends Error {
   }
 }
 
+/**
+ * Lo que llega de fuera, antes de normalizar: el horario y el conector vienen
+ * sueltos porque su validación vive AQUÍ. Si el tipo estricto se exigiera en la
+ * ruta, cada llamador tendría que hacer un cast — y un cast es justamente la
+ * comprobación que no ocurre.
+ */
+export type CalendarSettingsInput = Partial<
+  Omit<CalendarSettings, "weeklyHours" | "connector">
+> & {
+  weeklyHours?: unknown;
+  connector?: string;
+};
+
 export async function upsertSettings(
   organizationId: string,
-  input: Partial<CalendarSettings>
+  input: CalendarSettingsInput
 ): Promise<CalendarSettings> {
   const current = await getSettings(organizationId);
 
@@ -117,7 +130,9 @@ export async function upsertSettings(
   }
 
   const next: CalendarSettings = {
-    weeklyHours: normalizeWeeklyHours(input.weeklyHours ?? current.weeklyHours),
+    weeklyHours: normalizeWeeklyHours(
+      input.weeklyHours !== undefined ? input.weeklyHours : current.weeklyHours
+    ),
     slotMinutes: clampInt(
       input.slotMinutes ?? current.slotMinutes,
       LIMITS.slotMinutes.min,
@@ -176,11 +191,12 @@ export async function upsertSettings(
  * de inicio. Se prefiere limpiar a rechazar: un día mal escrito no debe tumbar
  * el guardado completo del horario.
  */
-export function normalizeWeeklyHours(input: WeeklyHours): WeeklyHours {
+export function normalizeWeeklyHours(input: unknown): WeeklyHours {
   const out: WeeklyHours = {};
   if (typeof input !== "object" || input === null) return out;
+  const source = input as Record<string, unknown>;
   for (const day of WEEKDAYS) {
-    const intervals = input[day];
+    const intervals = source[day];
     if (!Array.isArray(intervals)) continue;
     const valid = intervals
       .filter(isValidInterval)
