@@ -55,10 +55,14 @@ funciona igual.
 
 Ver [.specify/memory/constitution.md](.specify/memory/constitution.md).
 
-- **Soberanía (II, endurecida)**: dependencias de runtime SOLO WhatsApp Cloud
-  API + proveedor LLM OpenRouter-compatible opcional. PROHIBIDO en v1
-  introducir S3/R2, email, Stripe, Google u otros servicios externos. Auth y
-  BD self-hosted.
+- **Soberanía (II, endurecida — 1.4.0)**: el NÚCLEO depende solo de WhatsApp
+  Cloud API + proveedor LLM OpenRouter-compatible opcional; prohibido meterle
+  S3/R2, email, billing u otros terceros. Un servicio de terceros solo entra
+  como **conector opcional**: apagado por defecto tras bandera (patrón
+  ADR-001), aislado tras adaptador con contrato público, con camino sin
+  dependencia externa y degradación definida (su fallo jamás bloquea la
+  operación core), credenciales del negocio cifradas, y CI que lo prueba
+  apagado y encendido. Auth y BD self-hosted.
 - **Seguridad (I)**: secretos cifrados en reposo (AES-256-GCM, `lib/crypto`);
   jamás al cliente ni a logs. El token de WhatsApp solo muestra sus últimos 4.
 - **Multi-tenancy (III)**: `organization_id` NOT NULL en toda tabla de dominio;
