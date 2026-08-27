@@ -147,7 +147,7 @@ huecos correctos con etiqueta con día, DST correcto, enlace fijo opcional.
 - [X] T022 [US2] Agregar la pestaña "Agenda" (`/settings/calendar`) a `TABS` en
       `src/components/settings/settings-nav.tsx`, renderizada solo con la prop
       de bandera encendida (T016)
-- [ ] T023 [US2] Crear el guion `tests/e2e/us-agenda.md` (historias US1+US2) y
+- [X] T023 [US2] Crear el guion `tests/e2e/us-agenda.md` (historias US1+US2) y
       la sección "agenda: bandera y ajustes" en `scripts/e2e-selftest.mjs`:
       settings/availability → 404 con bandera apagada; defaults 200; guardar
       horario; huecos dentro de franja con etiqueta con día; enlace fijo vacío
@@ -210,7 +210,7 @@ sandbox, agente incluido.
       tokens) y la ejecución en `src/server/ai/pipeline.ts` con degradación (el
       motor adjunta las etiquetas reales; `startUtc` no ofrecido se rechaza y
       re-ofrece; fallo del motor → responde sin agendar, jamás tumba el turno)
-- [ ] T033 [US3] Sección "agenda: garantías" en `scripts/e2e-selftest.mjs` +
+- [X] T033 [US3] Sección "agenda: garantías" en `scripts/e2e-selftest.mjs` +
       extender `tests/e2e/us-agenda.md`: feliz con enlace-fijo (201 exacto),
       `slot_not_offered`, carrera con `slot_taken` + reservar la alternativa de
       inmediato, repetido → 409, lead avanza de etapa, Laboratorio agenda
@@ -250,7 +250,7 @@ completa en US5, que introduce el primer conector que puede fallar).
 - [X] T038 [US4] Agregar la entrada "Citas" (`/bookings`, icono de calendario
       de lucide-react) a `NAV` en `src/components/app-nav.tsx`, renderizada
       solo con la prop de bandera (T016)
-- [ ] T039 [US4] Sección "agenda: operador" en `scripts/e2e-selftest.mjs` +
+- [X] T039 [US4] Sección "agenda: operador" en `scripts/e2e-selftest.mjs` +
       guion: listar tras agendar por bot, reprogramar libera el hueco anterior,
       cancelar dos veces sin fallo, bloqueo oculta huecos, cita de prueba
       marcada
@@ -299,7 +299,7 @@ scopes completos documentados.
       COMPARTIDA parametrizada por conector (enlace-fijo + zoom): las 4
       operaciones, 404-tolerancia del delete, y el mapeo fallo→`link_pending` /
       auth→`status error` en el servicio
-- [ ] T046 [US5] Sección "agenda: zoom" en `scripts/e2e-selftest.mjs` + guion:
+- [X] T046 [US5] Sección "agenda: zoom" en `scripts/e2e-selftest.mjs` + guion:
       conectar (inválida → 422 sin persistir; válida → conectado), agendar crea
       reunión visible en `_state`, reprogramar conserva link, cancelar borra,
       **fallo al crear → 201 con `linkPending` → "Reintentar enlace" en la UI
@@ -344,7 +344,7 @@ advertencia de "En producción".
       + `src/server/dev/google-mock-state.ts` (`token`, events CRUD con link de
       Meet según T047, `_state`/`_reset`, refresh token `-invalid` → 400
       `invalid_grant`)
-- [ ] T053 [US6] Extender `tests/unit/connectors.test.ts` con google + sección
+- [X] T053 [US6] Extender `tests/unit/connectors.test.ts` con google + sección
       "agenda: google" en `scripts/e2e-selftest.mjs` + guion (conectar, evento
       creado/movido/borrado, token revocado → cita con `linkPending` +
       credencial en error visible)
@@ -358,23 +358,23 @@ advertencia de "En producción".
 **Purpose**: la documentación que es PARTE del alcance (FR-022) y la
 verificación final.
 
-- [ ] T054 [P] Crear `docs/agenda-conectores.md`: el contrato público, la guía
+- [X] T054 [P] Crear `docs/agenda-conectores.md`: el contrato público, la guía
       "escribe tu conector" (los 6 archivos exactos que toca un fork y las 5
       condiciones constitucionales), scopes de Zoom y gotchas de Google —
       contenido base en contracts/conector.md
-- [ ] T055 [P] Crear `docs/adr-002-conectores-de-agenda.md`: bandera `AGENDA`
+- [X] T055 [P] Crear `docs/adr-002-conectores-de-agenda.md`: bandera `AGENDA`
       hermana de `CHANNELS`, contrato de 4 operaciones, sin free-busy en v1, y
       el criterio de revisión (a la tercera bandera, conversación sobre una
       interfaz común — research D3)
-- [ ] T056 Reescribir en `README.md` la sección "Fuera de alcance a propósito"
+- [X] T056 Reescribir en `README.md` la sección "Fuera de alcance a propósito"
       (el motor ENTRA al core tras ADR-001 y la constitución 1.4.0, con la
       respuesta a sus dos argumentos originales — sección "Qué cambió" del
       spec) y agregar "Agenda y conectores": la bandera, la conexión de Zoom y
       Google, y el enlace fijo
-- [ ] T057 [P] Actualizar `CLAUDE.md` (fila del mapa del código: agenda →
+- [X] T057 [P] Actualizar `CLAUDE.md` (fila del mapa del código: agenda →
       `src/server/agenda/` + conectores; nota de la bandera) y
       `specs/README.md` (fila de `015` en la tabla de specs: ciclo completo)
-- [ ] T058 Corrida final: gate técnico (`pnpm typecheck && pnpm lint && pnpm
+- [X] T058 Corrida final: gate técnico (`pnpm typecheck && pnpm lint && pnpm
       build && pnpm test`) + `pnpm test:e2e` completo en LAS DOS
       configuraciones de la matriz + recorrido manual de
       `specs/015-motor-agenda-universal/quickstart.md`; lo intrínsecamente no

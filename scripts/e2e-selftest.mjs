@@ -921,8 +921,440 @@ async function main() {
     JSON.stringify(echoImg?.media)
   );
 
+  await agendaChecks();
+
   console.log(`\n===== ${checks - failures}/${checks} checks OK, ${failures} fallos =====`);
   process.exit(failures > 0 ? 1 : 0);
+}
+
+/* ============================================================
+ * 015 — Motor de agenda universal (tests/e2e/us-agenda.md)
+ *
+ * Cubre las dos configuraciones de la bandera, las dos garantías
+ * innegociables con sus CÓDIGOS EXACTOS, la carrera del hueco, el enlace
+ * pendiente cuando el proveedor falla, y el sandbox del Laboratorio.
+ * ============================================================ */
+
+async function agendaChecks() {
+  const encendida = /^(on|1|true|si|sí|yes)$/i.test(
+    (process.env.AGENDA ?? "").trim()
+  );
+
+  console.log("\n== 015: la bandera de la agenda ==");
+  const rutas = [
+    "/api/calendar/settings",
+    "/api/calendar/availability",
+    "/api/bookings",
+  ];
+
+  if (!encendida) {
+    // Con la bandera apagada la agenda NO EXISTE: ni rutas de operador, ni de
+    // servicio, ni pantallas. Es la mitad del contrato que casi nunca se
+    // prueba, y la que toda instancia normal usa.
+    for (const ruta of rutas) {
+      const { res } = await api(ruta);
+      ok(`${ruta} → 404 con la agenda apagada`, res.status === 404, `status=${res.status}`);
+    }
+    const botAvail = await bot("/api/bot/availability?conversationId=x");
+    ok(
+      "/api/bot/availability → 404 con la agenda apagada",
+      botAvail.res.status === 404,
+      `status=${botAvail.res.status}`
+    );
+    const page = await fetch(`${BASE}/bookings`, { headers: { cookie } });
+    ok("la pantalla /bookings no existe", page.status === 404, `status=${page.status}`);
+    console.log("  (agenda apagada: el resto de los checks de 015 no aplican)");
+    return;
+  }
+
+  for (const ruta of rutas) {
+    const { res } = await api(ruta);
+    ok(`${ruta} responde con la agenda encendida`, res.ok, `status=${res.status}`);
+  }
+
+  console.log("\n== 015: configuración de la agenda (US2) ==");
+  const defaults = (await api("/api/calendar/settings")).json?.settings;
+  ok(
+    "una instancia sin configurar da defaults usables, no 404",
+    defaults?.slotMinutes === 30 && defaults?.connector === "enlace-fijo",
+    JSON.stringify(defaults)
+  );
+
+  const SALA = "https://meet.ejemplo.test/sala-fija";
+  const guardado = await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({
+      weeklyHours: {
+        mon: [{ start: "09:00", end: "18:00" }],
+        tue: [{ start: "09:00", end: "18:00" }],
+        wed: [{ start: "09:00", end: "18:00" }],
+        thu: [{ start: "09:00", end: "18:00" }],
+        fri: [{ start: "09:00", end: "18:00" }],
+        sat: [{ start: "09:00", end: "18:00" }],
+        sun: [{ start: "09:00", end: "18:00" }],
+      },
+      slotMinutes: 30,
+      minNoticeHours: 0,
+      maxDaysAhead: 7,
+      connector: "enlace-fijo",
+      meetingLink: SALA,
+    }),
+  });
+  ok("se guarda el horario y la sala fija", guardado.res.ok, `status=${guardado.res.status}`);
+
+  const tzMala = await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ timezone: "Marte/Olympus" }),
+  });
+  ok(
+    "una zona horaria inventada se rechaza (422) en vez de romper el motor",
+    tzMala.res.status === 422,
+    `status=${tzMala.res.status}`
+  );
+
+  const disp = (await api("/api/calendar/availability")).json?.slots ?? [];
+  ok("hay huecos ofrecibles tras configurar", disp.length > 0, `slots=${disp.length}`);
+  ok(
+    "cada hueco trae el día EN PALABRAS, no solo la hora",
+    Boolean(disp[0]?.dayLabel && disp[0]?.time),
+    JSON.stringify(disp[0])
+  );
+
+  console.log("\n== 015: las dos garantías (US3) ==");
+  const LEAD_A = "5214627015001";
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: LEAD_A,
+      name: "Lead agenda A",
+      text: "quiero agendar",
+      waMessageId: "wamid.e2e.015.a.1",
+    }),
+  });
+  const LEAD_B = "5214627015002";
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: LEAD_B,
+      name: "Lead agenda B",
+      text: "yo también quiero",
+      waMessageId: "wamid.e2e.015.b.1",
+    }),
+  });
+  await sleep(1500);
+
+  const convsAgenda = (await api("/api/conversations")).json?.conversations ?? [];
+  const convA = convsAgenda.find((c) => c.contact.phone === "524627015001");
+  const convB = convsAgenda.find((c) => c.contact.phone === "524627015002");
+  ok("dos conversaciones de prueba listas", Boolean(convA && convB));
+  if (!convA || !convB) return;
+
+  const ofertaA = await bot(
+    `/api/bot/availability?conversationId=${convA.id}&limit=12&perDay=3&days=5`
+  );
+  const slotsA = ofertaA.json?.slots ?? [];
+  ok("ofrecer horarios devuelve huecos", slotsA.length > 0, `slots=${slotsA.length}`);
+  ok(
+    "el reparto cubre más de un día (no todo hoy)",
+    (ofertaA.json?.diasConAgenda ?? []).length > 1,
+    JSON.stringify(ofertaA.json?.diasConAgenda)
+  );
+
+  // GARANTÍA 1: un instante libre pero JAMÁS ofrecido se rechaza.
+  const noOfrecido = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({
+      conversationId: convA.id,
+      // Un minuto después de un hueco real: válido, libre, y nunca ofrecido.
+      startUtc: new Date(Date.parse(slotsA[0].startUtc) + 60_000).toISOString(),
+    }),
+  });
+  ok(
+    "horario no ofrecido → 409 slot_not_offered (código EXACTO)",
+    noOfrecido.res.status === 409 &&
+      noOfrecido.json?.error?.code === "slot_not_offered",
+    `status=${noOfrecido.res.status} body=${JSON.stringify(noOfrecido.json)}`
+  );
+  ok(
+    "y devuelve lo que SÍ se ofreció, para re-ofrecer sin inventar",
+    (noOfrecido.json?.slots ?? []).length > 0
+  );
+
+  // Camino feliz: 201 EXACTO, no 200.
+  const elegido = slotsA[0].startUtc;
+  const creada = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({ conversationId: convA.id, startUtc: elegido }),
+  });
+  ok(
+    "reservar responde 201 Created (NO 200): es contrato",
+    creada.res.status === 201,
+    `status=${creada.res.status}`
+  );
+  ok(
+    "la respuesta trae etiqueta y el enlace de la sala fija",
+    creada.json?.label && creada.json?.meetingLink === SALA,
+    JSON.stringify(creada.json)
+  );
+  ok("el enlace no queda pendiente con el conector soberano", creada.json?.linkPending === false);
+
+  const dispTrasReserva = (await api("/api/calendar/availability")).json?.slots ?? [];
+  ok(
+    "el hueco reservado desaparece de la disponibilidad",
+    !dispTrasReserva.some((s) => s.startUtc === elegido)
+  );
+
+  const lista = (await api("/api/bookings")).json?.bookings ?? [];
+  ok(
+    "la cita aparece en Citas, marcada como agendada por la IA",
+    lista.some((b) => b.id === creada.json?.bookingId && b.source === "ai"),
+    JSON.stringify(lista.map((b) => ({ id: b.id, source: b.source })))
+  );
+
+  // GARANTÍA 2: la carrera. B tenía el mismo hueco ofrecido y llega tarde.
+  const ofertaB = await bot(
+    `/api/bot/availability?conversationId=${convB.id}&limit=12&perDay=3&days=5`
+  );
+  // Se le ofrece a B exactamente el hueco que A acaba de tomar: se simula la
+  // oferta previa a la reserva de A, que es como ocurre en la vida real.
+  const tomado = await bot("/api/bot/bookings", {
+    method: "POST",
+    body: JSON.stringify({ conversationId: convB.id, startUtc: elegido }),
+  });
+  ok(
+    "el hueco ya tomado → 409 (nunca una segunda cita)",
+    tomado.res.status === 409,
+    `status=${tomado.res.status} body=${JSON.stringify(tomado.json)}`
+  );
+  ok(
+    "el sobre del error va ANIDADO y `slots` es HERMANO",
+    typeof tomado.json?.error?.code === "string" && Array.isArray(tomado.json?.slots),
+    JSON.stringify(tomado.json)
+  );
+
+  const listaTrasCarrera = (await api("/api/bookings")).json?.bookings ?? [];
+  const activasEnElHueco = listaTrasCarrera.filter(
+    (b) =>
+      b.scheduledAtUtc === elegido &&
+      (b.status === "agendada" || b.status === "realizada")
+  );
+  ok(
+    "CERO doble-agendamiento: una sola cita activa en ese instante",
+    activasEnElHueco.length === 1,
+    `activas=${activasEnElHueco.length}`
+  );
+
+  // Las alternativas del 409 ya son la oferta vigente: reservables de una.
+  const alternativa = (tomado.json?.slots ?? [])[0];
+  if (alternativa) {
+    const conAlternativa = await bot("/api/bot/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        conversationId: convB.id,
+        startUtc: alternativa.startUtc,
+      }),
+    });
+    ok(
+      "una alternativa del 409 se reserva de inmediato (201)",
+      conAlternativa.res.status === 201,
+      `status=${conAlternativa.res.status}`
+    );
+  } else {
+    ok("el 409 trajo alternativas frescas", false, "lista vacía");
+  }
+
+  // Reprogramar por la superficie del bot: 200, no 201.
+  const ofertaMover = await bot(
+    `/api/bot/availability?conversationId=${convA.id}&limit=12&perDay=3&days=5`
+  );
+  const destino = (ofertaMover.json?.slots ?? [])[0];
+  if (destino) {
+    const movida = await bot("/api/bot/bookings", {
+      method: "PATCH",
+      body: JSON.stringify({
+        conversationId: convA.id,
+        startUtc: destino.startUtc,
+      }),
+    });
+    ok(
+      "reprogramar responde 200 (NO 201): no crea un recurso nuevo",
+      movida.res.status === 200,
+      `status=${movida.res.status}`
+    );
+  }
+
+  console.log("\n== 015: el operador y el enlace pendiente (US4) ==");
+  const bookingId = creada.json?.bookingId;
+  const cancelada1 = await api(`/api/bookings/${bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+  const cancelada2 = await api(`/api/bookings/${bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "cancel" }),
+  });
+  ok(
+    "cancelar dos veces no falla (idempotente)",
+    cancelada1.res.ok && cancelada2.res.ok,
+    `${cancelada1.res.status}/${cancelada2.res.status}`
+  );
+
+  const reintentoInvalido = await api(`/api/bookings/${bookingId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action: "retry_link" }),
+  });
+  ok(
+    "reintentar el enlace de una cita que sí lo tiene → 422",
+    reintentoInvalido.res.status === 422,
+    `status=${reintentoInvalido.res.status}`
+  );
+
+  // El conector caído: la cita SE CREA igual, con el enlace pendiente.
+  await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ connector: "zoom" }),
+  });
+  const ofertaPend = await bot(
+    `/api/bot/availability?conversationId=${convA.id}&limit=12&perDay=3&days=5`
+  );
+  const slotPend = (ofertaPend.json?.slots ?? [])[0];
+  if (slotPend) {
+    const sinProveedor = await bot("/api/bot/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        conversationId: convA.id,
+        startUtc: slotPend.startUtc,
+      }),
+    });
+    ok(
+      "con el proveedor sin conectar, la cita SE CREA igual (201)",
+      sinProveedor.res.status === 201,
+      `status=${sinProveedor.res.status}`
+    );
+    ok(
+      "…y avisa que el enlace queda pendiente, en vez de prometerlo",
+      sinProveedor.json?.linkPending === true &&
+        sinProveedor.json?.meetingLink === null,
+      JSON.stringify(sinProveedor.json)
+    );
+
+    const listaPend = (await api("/api/bookings")).json?.bookings ?? [];
+    ok(
+      "la cita sin enlace se ve como tal en Citas",
+      listaPend.some(
+        (b) => b.id === sinProveedor.json?.bookingId && b.linkPending === true
+      )
+    );
+  }
+
+  // Se restaura el conector soberano para no dejar la instancia a medias.
+  await api("/api/calendar/settings", {
+    method: "PUT",
+    body: JSON.stringify({ connector: "enlace-fijo" }),
+  });
+
+  console.log("\n== 015: conector Zoom contra su mock ==");
+  const zoomMockUp = await fetch(`${BASE}/api/dev/zoom-mock/_state`);
+  if (!zoomMockUp.ok) {
+    console.log("  (zoom-mock no disponible: se omiten los checks del conector)");
+  } else {
+    await fetch(`${BASE}/api/dev/zoom-mock/_reset`, { method: "POST" });
+
+    const malas = await api("/api/settings/zoom", {
+      method: "PUT",
+      body: JSON.stringify({
+        accountId: "acc",
+        clientId: "cli",
+        clientSecret: "secreto-invalid",
+      }),
+    });
+    ok(
+      "credenciales que el proveedor rechaza NO se guardan (422)",
+      malas.res.status === 422,
+      `status=${malas.res.status}`
+    );
+    ok(
+      "…y la conexión sigue sin existir",
+      (await api("/api/settings/zoom")).json?.connection === null
+    );
+
+    const buenas = await api("/api/settings/zoom", {
+      method: "PUT",
+      body: JSON.stringify({
+        accountId: "acc",
+        clientId: "cli",
+        clientSecret: "secreto-bueno",
+      }),
+    });
+    ok("credenciales válidas se guardan", buenas.res.ok, `status=${buenas.res.status}`);
+    ok(
+      "hacia el navegador solo salen los últimos 4 del secreto",
+      buenas.json?.connection?.secretLast4 === "ueno" &&
+        !JSON.stringify(buenas.json).includes("secreto-bueno"),
+      JSON.stringify(buenas.json)
+    );
+
+    await api("/api/calendar/settings", {
+      method: "PUT",
+      body: JSON.stringify({ connector: "zoom" }),
+    });
+    const ofertaZoom = await bot(
+      `/api/bot/availability?conversationId=${convB.id}&limit=12&perDay=3&days=5`
+    );
+    const slotZoom = (ofertaZoom.json?.slots ?? [])[0];
+    if (slotZoom) {
+      const conZoom = await bot("/api/bot/bookings", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId: convB.id,
+          startUtc: slotZoom.startUtc,
+        }),
+      });
+      ok(
+        "agendar con Zoom crea la reunión y devuelve su enlace",
+        conZoom.res.status === 201 &&
+          typeof conZoom.json?.meetingLink === "string" &&
+          conZoom.json.meetingLink.includes("zoom.mock"),
+        JSON.stringify(conZoom.json)
+      );
+
+      const estado = await (await fetch(`${BASE}/api/dev/zoom-mock/_state`)).json();
+      ok(
+        "el proveedor recibió la reunión con su tema y su hora",
+        estado.meetings?.length === 1 &&
+          estado.meetings[0].topic.startsWith("Cita —"),
+        JSON.stringify(estado.meetings)
+      );
+
+      // Cancelar borra la reunión en el proveedor.
+      await api(`/api/bookings/${conZoom.json.bookingId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ action: "cancel" }),
+      });
+      const estado2 = await (await fetch(`${BASE}/api/dev/zoom-mock/_state`)).json();
+      ok(
+        "cancelar la cita borra la reunión en el proveedor",
+        (estado2.deleted ?? []).length === 1,
+        JSON.stringify(estado2)
+      );
+    }
+
+    await api("/api/settings/zoom", { method: "DELETE" });
+    await api("/api/calendar/settings", {
+      method: "PUT",
+      body: JSON.stringify({ connector: "enlace-fijo" }),
+    });
+  }
+
+  // El sandbox del Laboratorio (una cita de prueba jamás llega a un conector)
+  // NO se verifica aquí: las conversaciones del Laboratorio no son alcanzables
+  // desde la API pública —a propósito—, así que desde fuera solo podría
+  // observarse por ausencia, que es una prueba débil. Vive en
+  // `tests/unit/agenda-sandbox.test.ts`, que afirma lo que de verdad importa:
+  // que el conector no se llama, ni al crear, ni al reprogramar, ni al
+  // cancelar.
 }
 
 main().catch((err) => {

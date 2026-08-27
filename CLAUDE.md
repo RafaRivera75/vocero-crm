@@ -33,6 +33,8 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 | La ingesta/envío de mensajes | `src/server/inbox/` (ingest idempotente, send con guard de sandbox, ventana 24h) |
 | Cómo se identifica a un contacto | `src/server/inbox/identity.ts` (teléfono normalizado o `bsuid:<id>`) |
 | Conectar TU propio bot en vez del agente | `src/app/api/bot/*` + `src/server/bot/auth.ts` (X-API-Key) |
+| La agenda (horarios, huecos, citas) | `src/server/agenda/` — detrás de la bandera `AGENDA` (`flag.ts`) |
+| Cómo se entrega la reunión (Zoom, Meet…) | `src/server/agenda/connectors/` + catálogo en `src/lib/agenda-connectors.ts` · guía: [docs/agenda-conectores.md](docs/agenda-conectores.md) |
 | UI | `src/components/` + `src/app/(app)/` |
 
 Los mocks del entorno de pruebas viven en `src/app/api/dev/` (wa-mock +
@@ -70,7 +72,13 @@ Ver [.specify/memory/constitution.md](.specify/memory/constitution.md).
 - **Idempotencia (IV)**: webhooks dedup por `wa_message_id` UNIQUE; estados
   monotónicos; seeds y migraciones re-ejecutables.
 - **Sandbox del Laboratorio**: las conversaciones `is_test` JAMÁS tocan la API
-  real — el sender lanza excepción (no lo "arregles": es un guardrail).
+  real — el sender lanza excepción (no lo "arregles": es un guardrail). Lo
+  mismo vale para la agenda: una cita de prueba nunca llega a un conector.
+- **Módulos opcionales (015)**: lo que no usa toda instancia va detrás de una
+  bandera de despliegue, apagado por defecto, con su superficie en 404 y la
+  migración aplicada igual. Nunca en una rama aparte
+  ([ADR-001](docs/adr-001-canales-opcionales.md),
+  [ADR-002](docs/adr-002-conectores-de-agenda.md)).
 
 ## Variables de entorno
 
