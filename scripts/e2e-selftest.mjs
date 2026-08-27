@@ -179,6 +179,60 @@ async function main() {
   );
   ok("el contacto reconciliado conserva su conversación", !!mxConv);
 
+  // Issue #35: un destinatario argentino llega como `549` + 10 dígitos y hay
+  // que ENVIARLE sin el 9. La identidad, en cambio, conserva lo que Meta
+  // reporta: si se reescribiera, dejaría de casar con el `wa_id` de cada
+  // webhook y el contacto se partiría en dos.
+  console.log("\n== us-bsuid: destinatario argentino (549 → 54) ==");
+  const AR_REPORTADO = "5491122334455";
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: AR_REPORTADO,
+      name: "Lead AR",
+      text: "hola desde Argentina",
+      waMessageId: "wamid.e2e.ar.1",
+    }),
+  });
+  await sleep(1200);
+  const convAr = ((await api("/api/conversations")).json?.conversations ?? []).find(
+    (c) => c.contact.name === "Lead AR"
+  );
+  ok("la conversación argentina se creó", Boolean(convAr));
+  ok(
+    "la identidad guardada conserva el 9 que reporta Meta",
+    convAr?.contact.phone === AR_REPORTADO,
+    `phone=${convAr?.contact.phone}`
+  );
+
+  if (convAr) {
+    // Se cuenta lo que ya había en vez de vaciar el outbox: el DELETE del
+    // wa-mock reinicia su contador de wa_message_id, y en una RE-CORRIDA eso
+    // choca con los mensajes que ya están en la base (unique) y tumba el envío
+    // con un 500 que no tiene nada que ver con lo que se está probando.
+    const outboxAntes =
+      ((await api("/api/dev/wa-mock/outbox")).json?.outbox ?? []).length;
+    const envioAr = await api(`/api/conversations/${convAr.id}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ text: "respuesta a Argentina" }),
+    });
+    ok("el mensaje a Argentina se envía", envioAr.res.ok, `status=${envioAr.res.status}`);
+    const outboxAr = (
+      (await api("/api/dev/wa-mock/outbox")).json?.outbox ?? []
+    ).slice(outboxAntes);
+    ok(
+      "por el cable viaja SIN el 9 (lo que la lista de permitidos acepta)",
+      outboxAr.some((o) => o.to === "541122334455"),
+      JSON.stringify(outboxAr.map((o) => o.to))
+    );
+    ok(
+      "…y nunca con el 9, que es lo que devolvía 131030",
+      !outboxAr.some((o) => o.to === AR_REPORTADO),
+      JSON.stringify(outboxAr.map((o) => o.to))
+    );
+  }
+
   console.log("\n== us-bot-api: autorización ==");
   const noKey = await api("/api/bot/media/media123");
   ok("media sin API key → 401", noKey.res.status === 401);
