@@ -29,18 +29,18 @@ incremento independiente verificable.
 **Purpose**: esquema, migración y variables — la estructura idéntica en todas
 las instancias (ADR-001).
 
-- [ ] T001 Agregar las cinco tablas de data-model.md (`calendar_settings`,
+- [X] T001 Agregar las cinco tablas de data-model.md (`calendar_settings`,
       `booking`, `offered_slot`, `zoom_credentials`, `google_credentials`) a
       `src/lib/db/schema.ts`, con columnas, FKs, índices y comentarios de
       intención (por qué `meeting_link`/`connector` se copian en la cita)
-- [ ] T002 [P] Registrar los prefijos de id `cal_`, `bk_`, `ofs_`, `zcred_`,
+- [X] T002 [P] Registrar los prefijos de id `cal_`, `bk_`, `ofs_`, `zcred_`,
       `gcred_` en `src/lib/db/ids.ts`
-- [ ] T003 [P] Declarar `AGENDA`, `ZOOM_BASE_URL`, `ZOOM_OAUTH_BASE_URL`,
+- [X] T003 [P] Declarar `AGENDA`, `ZOOM_BASE_URL`, `ZOOM_OAUTH_BASE_URL`,
       `GOOGLE_CAL_BASE_URL`, `GOOGLE_OAUTH_BASE_URL` en el esquema zod de
       `src/lib/env.ts` (opcionales, defaults reales; NO `process.env` directo —
       no repetir la inconsistencia de `IG_GRAPH_BASE_URL`) y documentarlas en
       `.env.example` con guía inline (`AGENDA` apagada por defecto)
-- [ ] T004 Generar `drizzle/0009_motor_agenda.sql` con `pnpm db:generate` y
+- [X] T004 Generar `drizzle/0009_motor_agenda.sql` con `pnpm db:generate` y
       editarla a mano para que sea re-ejecutable (`IF NOT EXISTS`, FKs en
       DO-blocks) e incluya el índice **UNIQUE parcial**
       `booking_org_active_slot_uq (organization_id, scheduled_at) WHERE status
@@ -56,30 +56,30 @@ las instancias (ADR-001).
 
 **⚠️ CRITICAL**: ninguna historia arranca sin esta fase completa.
 
-- [ ] T005 [P] Portar de la cantera los helpers puros de tiempo a
+- [X] T005 [P] Portar de la cantera los helpers puros de tiempo a
       `src/lib/time/slots.ts` (`Intl`, sin dependencias: expandir horario de
       pared a UTC, día de semana en zona, etiquetas es-MX con día en palabras,
       `overlaps` fin-exclusivo) — research D1
-- [ ] T006 [P] Portar `tests/unit/slots.test.ts` (DST Nueva York/Madrid/México,
+- [X] T006 [P] Portar `tests/unit/slots.test.ts` (DST Nueva York/Madrid/México,
       hora inexistente y ambigua, franjas partidas)
-- [ ] T007 Crear `src/server/agenda/settings.ts`: tipos + defaults (L-V
+- [X] T007 Crear `src/server/agenda/settings.ts`: tipos + defaults (L-V
       09:00-18:00, 30 min, aviso 2 h, ventana 7 días, `enlace-fijo`) +
       get/upsert con clamps, validación de timezone contra el runtime (422) y
       de `connector` contra el catálogo
-- [ ] T008 Crear `src/server/agenda/availability.ts`:
+- [X] T008 Crear `src/server/agenda/availability.ts`:
       `computeAvailability` (horario − citas activas − bloqueos, aviso mínimo,
       ventana) y `findSlot` (re-validación acotada ±1 día, coincidencia por
       epoch exacto, `excludeBookingId` para reprogramar) — portado de la
       cantera; ocupan agenda solo `agendada`/`realizada` reales
-- [ ] T009 Crear `src/server/agenda/spread.ts`: reparto de huecos por día
+- [X] T009 Crear `src/server/agenda/spread.ts`: reparto de huecos por día
       (`perDay`/`days`) con `dayIso`/`dayLabel`/`time` — patrón del fork,
       incidente 2026-08-07 (el catálogo es más ancho que el menú)
-- [ ] T010 [P] Crear `tests/unit/availability.test.ts` (franja partida, aviso
+- [X] T010 [P] Crear `tests/unit/availability.test.ts` (franja partida, aviso
       mínimo, respiro, ventana, bloqueo oculta, cancelada libera, reparto por
       día)
-- [ ] T011 [P] Crear `src/server/agenda/connectors/types.ts` con el contrato
+- [X] T011 [P] Crear `src/server/agenda/connectors/types.ts` con el contrato
       exacto de contracts/conector.md (4 operaciones + `ConnectorCapabilities`)
-- [ ] T012 Crear `src/server/agenda/connectors/enlace-fijo.ts` (createMeeting →
+- [X] T012 Crear `src/server/agenda/connectors/enlace-fijo.ts` (createMeeting →
       link de settings o null; update/delete no-op; test siempre ok) y el
       catálogo `src/server/agenda/connectors/index.ts` (registro por id, el
       motor pregunta capacidades — molde de `src/server/channels/capabilities.ts`)
@@ -97,23 +97,23 @@ configuraciones (FR-001, FR-021).
 y se comporta EXACTAMENTE como hoy; matriz de CI verde en las dos
 configuraciones.
 
-- [ ] T013 [US1] Crear `src/server/agenda/flag.ts`: `agendaEnabled()` (acepta
+- [X] T013 [US1] Crear `src/server/agenda/flag.ts`: `agendaEnabled()` (acepta
       `on`/`1`/`true`, tolerante a mayúsculas/espacios; cualquier otra cosa =
       apagada) y `agendaDisabledResponse()` → 404 con el razonamiento de
       ADR-001 ("el endpoint no existe en esta instancia") — molde de
       `src/server/channels/enabled.ts`
-- [ ] T014 [P] [US1] Crear `tests/unit/agenda-flag.test.ts` (ausente, `on`,
+- [X] T014 [P] [US1] Crear `tests/unit/agenda-flag.test.ts` (ausente, `on`,
       valores raros, mayúsculas) — molde de `tests/unit/channels.test.ts`
-- [ ] T015 [US1] En `src/app/(app)/layout.tsx` calcular `agendaEnabled()` en el
+- [X] T015 [US1] En `src/app/(app)/layout.tsx` calcular `agendaEnabled()` en el
       servidor y pasarlo por prop a través de `AppShell` hasta `AppNav`
       (patrón server-calcula→prop de `inbox/page.tsx`; los navs NO leen env)
-- [ ] T016 [US1] En `src/components/app-nav.tsx` y
+- [X] T016 [US1] En `src/components/app-nav.tsx` y
       `src/components/settings/settings-nav.tsx` aceptar la prop de bandera
       (default apagada) SIN agregar entradas aún: con la prop ausente el render
       actual queda byte a byte idéntico
-- [ ] T017 [US1] En `src/app/(app)/settings/layout.tsx` (server component)
+- [X] T017 [US1] En `src/app/(app)/settings/layout.tsx` (server component)
       calcular la bandera y pasarla a `SettingsNav`
-- [ ] T018 [US1] En `.github/workflows/ci.yml` agregar la matriz de dos
+- [X] T018 [US1] En `.github/workflows/ci.yml` agregar la matriz de dos
       configuraciones al job `gates`: `default` (sin `CHANNELS` ni `AGENDA`) y
       `completo` (`CHANNELS=whatsapp,instagram`, `AGENDA=on`) — paga la deuda
       que ADR-001 prometió y nunca implementó

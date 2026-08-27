@@ -30,6 +30,18 @@ const envSchema = z.object({
   // Ej.: CHANNELS=whatsapp,instagram. Sin ella, la instancia es solo WhatsApp
   // y las superficies de los demas canales responden 404.
   CHANNELS: z.string().optional(),
+  // 015: motor de agenda. Apagado por defecto — sin el, toda la superficie de
+  // agenda responde 404 y la UI no la menciona. Ej.: AGENDA=on
+  AGENDA: z.string().optional(),
+  // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
+  // mocks en el self-test; en producción se usan las reales.
+  ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),
+  ZOOM_OAUTH_BASE_URL: z.string().url().default("https://zoom.us"),
+  GOOGLE_CAL_BASE_URL: z
+    .string()
+    .url()
+    .default("https://www.googleapis.com/calendar/v3"),
+  GOOGLE_OAUTH_BASE_URL: z.string().url().default("https://oauth2.googleapis.com"),
   ALLOW_SIGNUP: z.string().optional(),
   AGENT_COALESCE_MS: z.coerce.number().int().min(0).default(6000),
   WA_MOCK_ENABLED: z.string().optional(),
