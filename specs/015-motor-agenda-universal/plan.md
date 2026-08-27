@@ -6,8 +6,8 @@
 
 **Estado**: planeación completa (Fase 0 + Fase 1). Enmienda constitucional
 [**ratificada y aplicada**](./enmienda-constitucional.md) (1.4.0, 2026-08-26).
-`tasks.md` NO generado — instrucción explícita del dueño: llegar hasta la
-planeación. Siguiente paso cuando lo decida: `/speckit-tasks`.
+[`tasks.md`](./tasks.md) **generado** (2026-08-26, 58 tareas por historia).
+Siguiente paso cuando el dueño lo decida: `/speckit-implement`.
 
 ## Summary
 
@@ -106,7 +106,7 @@ specs/015-motor-agenda-universal/
 │   └── conector.md             # Contrato de conector + catálogo v1 + guía para forks
 ├── checklists/
 │   └── requirements.md         # Calidad del spec
-└── tasks.md                    # Fase 2 (/speckit-tasks) — NO generado aún, por instrucción
+└── tasks.md                    # Fase 2 (/speckit-tasks) — 58 tareas en 9 fases, por historia
 ```
 
 ### Source Code (repository root)

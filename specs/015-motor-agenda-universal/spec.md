@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-26
 
-**Status**: Draft — enmienda constitucional [ratificada y aplicada](./enmienda-constitucional.md) (constitución 1.4.0, 2026-08-26); lista para `/speckit-tasks`
+**Status**: Draft — enmienda constitucional [ratificada y aplicada](./enmienda-constitucional.md) (constitución 1.4.0) y [tareas generadas](./tasks.md) (2026-08-26); lista para `/speckit-implement`
 
 **Input**: Decisión del dueño 2026-08-26: "agregar a Vocero raíz el motor de
 agendamiento con slots así como lo tengo en mi CRM, pero en modo bandera, tal
