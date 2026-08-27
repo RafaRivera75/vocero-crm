@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-26
 
-**Status**: Draft — pendiente de ratificar la [enmienda constitucional](./enmienda-constitucional.md) antes de implementar
+**Status**: Draft — enmienda constitucional [ratificada y aplicada](./enmienda-constitucional.md) (constitución 1.4.0, 2026-08-26); lista para `/speckit-tasks`
 
 **Input**: Decisión del dueño 2026-08-26: "agregar a Vocero raíz el motor de
 agendamiento con slots así como lo tengo en mi CRM, pero en modo bandera, tal
@@ -81,12 +81,14 @@ Quien use otra tecnología (Teams, Outlook, CalDAV, Cal.com…) implementa el
 contrato en su fork siguiendo la guía publicada — esa extensibilidad es parte
 del producto, no un accidente.
 
-**Puerta constitucional**: `zoom` y `google` violan la lista cerrada del
-Principio II vigente (que además prohíbe Google explícitamente). Esta feature
-NO se implementa sin ratificar antes la
-[enmienda propuesta](./enmienda-constitucional.md) (1.3.0 → 1.4.0): conectores
-opcionales tras bandera, apagados por defecto, aislados tras adaptador, con
-degradación definida y credenciales cifradas del propio negocio.
+**Puerta constitucional**: `zoom` y `google` violaban la lista cerrada del
+Principio II de la constitución 1.3.0 (que además prohibía Google
+nominalmente). La [enmienda](./enmienda-constitucional.md) (1.3.0 → 1.4.0) fue
+**ratificada por el responsable y aplicada el 2026-08-26**: los conectores
+opcionales son admisibles bajo cinco condiciones —apagados por defecto tras
+bandera, aislados tras adaptador, instancia completa sin ellos con degradación
+definida, credenciales cifradas del propio negocio, verificables en CI en ambas
+configuraciones— y este diseño cumple las cinco.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -553,6 +555,6 @@ reconexión.
   atrás y su migración colisiona de número — exactamente el costo que ADR-001
   predijo para las ramas. Se usa como cantera de código y de evidencia; la
   feature nace de main.
-- **La enmienda constitucional (1.4.0) se ratifica antes de implementar**; sin
-  ratificación, el alcance se recorta a bandera + motor + `enlace-fijo` (que no
-  violan nada).
+- **La enmienda constitucional (1.4.0) fue ratificada y aplicada el
+  2026-08-26**; el plan B de recorte (bandera + motor + `enlace-fijo`) quedó
+  sin efecto.

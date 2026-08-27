@@ -4,11 +4,10 @@
 
 **Input**: Feature specification from `/specs/015-motor-agenda-universal/spec.md`
 
-**Estado**: planeación completa (Fase 0 + Fase 1). `tasks.md` NO generado —
-instrucción explícita del dueño: llegar hasta la planeación. Siguiente paso
-cuando lo decida: ratificar (o rechazar) la
-[enmienda constitucional](./enmienda-constitucional.md) y correr
-`/speckit-tasks`.
+**Estado**: planeación completa (Fase 0 + Fase 1). Enmienda constitucional
+[**ratificada y aplicada**](./enmienda-constitucional.md) (1.4.0, 2026-08-26).
+`tasks.md` NO generado — instrucción explícita del dueño: llegar hasta la
+planeación. Siguiente paso cuando lo decida: `/speckit-tasks`.
 
 ## Summary
 
@@ -71,7 +70,7 @@ días, citas de 30 min ⇒ decenas de slots por consulta.
 | Principio | Cómo lo cumple esta feature |
 |---|---|
 | **I. Seguridad de datos** | Credenciales de conector cifradas AES-256-GCM con `lib/crypto` (mismo mecanismo, no uno segundo), tablas explícitas por proveedor, hacia afuera solo `last4` + estado; jamás a logs. El enlace fijo no se cifra: es una URL que el negocio reparte. |
-| **II. Soberanía (endurecido)** | ⚠️ **VIOLACIÓN REGISTRADA**: `zoom` y `google` son servicios externos fuera de la lista cerrada (Google además prohibido nominalmente). Mitigación: el motor y `enlace-fijo` son 100% soberanos (cero deps); los conectores externos van tras bandera apagada por defecto, aislados tras adaptador con contrato público, degradables (la cita nunca depende del tercero) y con credenciales del propio negocio. Ver Complexity Tracking y la [enmienda 1.4.0](./enmienda-constitucional.md) — **su ratificación es prerequisito de implementación**; si se rechaza, el alcance se recorta a bandera + motor + `enlace-fijo` (cero violaciones). |
+| **II. Soberanía (endurecido, 1.4.0)** | ✅ CUMPLE bajo la constitución 1.4.0 ([enmienda ratificada y aplicada](./enmienda-constitucional.md) el 2026-08-26): `zoom` y `google` entran como **conectores opcionales** y el diseño satisface las cinco condiciones — (1) apagados por defecto tras `AGENDA`; (2) adaptadores aislados con contrato público; (3) camino sin dependencia (`enlace-fijo`) y degradación definida (link pendiente: la cita nunca depende del tercero); (4) credenciales del propio negocio cifradas; (5) matriz de CI + mocks con camino infeliz. Historia: contra la 1.3.0 esto era una violación registrada — queda documentada en Complexity Tracking para trazabilidad. |
 | **III. Multi-tenancy** | `organization_id NOT NULL` org-first en las cinco tablas; acceso por `scoped()`; credenciales únicas por organización. |
 | **IV. Idempotencia** | Cancelar dos veces no falla; `deleteMeeting` trata 404 como éxito; el índice UNIQUE parcial convierte la confirmación repetida/concurrente en `409` en vez de duplicado; migración `IF NOT EXISTS` re-ejecutable. |
 | **V. Calidad verificable** | Gate técnico + unit de la carrera y del contrato de conectores + arnés E2E extendido; códigos y sobre verificados exactos (research D9). |
@@ -86,8 +85,9 @@ bifurcación, simétrica en crear/reprogramar/cancelar — FR-017, corrigiendo l
 asimetría accidental del fork). El sender de WhatsApp sigue lanzando en
 sandbox — no se toca.
 
-**Resultado del gate**: PASA CON UNA VIOLACIÓN JUSTIFICADA (II), condicionada a
-la enmienda. Re-evaluado tras Fase 1: el diseño no agregó violaciones nuevas.
+**Resultado del gate**: PASA sin violaciones vigentes — la única (II, contra la
+1.3.0) quedó resuelta por la enmienda ratificada y aplicada (1.4.0,
+2026-08-26). Re-evaluado tras Fase 1: el diseño no agregó violaciones nuevas.
 
 ## Project Structure
 
@@ -189,7 +189,7 @@ docs/
 README.md                                 # EDITA · reescribe "Fuera de alcance a propósito" + sección de agenda y conectores
 .env.example                              # EDITA · AGENDA con guía inline
 CLAUDE.md                                 # EDITA · mapa del código (fila de agenda/conectores) + regla de conectores
-.specify/memory/constitution.md           # EDITA · SOLO tras ratificar la enmienda (1.4.0 + Sync Impact Report)
+.specify/memory/constitution.md           # EDITADA · enmienda aplicada (1.4.0 + Sync Impact Report, 2026-08-26)
 ```
 
 **Structure Decision**: se respeta la separación del repo — helpers puros en
@@ -205,11 +205,12 @@ etiquetas en español, como el resto: `/bookings` (nav "Citas"),
 independientes): US1 bandera (flag + 404 + navs condicionales + CI matriz) →
 US2 settings + enlace-fijo → US3 motor + garantías + bot + agente → US4 página
 Citas → US5 conector Zoom + mock → US6 conector Google + mock → docs/README/
-ADR-002. La enmienda se ratifica antes de US5 (o se recorta el alcance ahí).
+ADR-002. La enmienda ya está ratificada y aplicada (1.4.0): US5 y US6 quedan
+desbloqueadas desde el arranque.
 
 ## Complexity Tracking
 
 | Violación | Por qué se necesita | Alternativa más simple rechazada porque |
 |---|---|---|
-| Principio II: servicios externos `zoom`/`google` fuera de la lista cerrada | Es el pedido del dueño y la ventaja competitiva declarada: la reunión debe entregarse donde el negocio ya vive (Zoom/Meet/Calendar), con contrato para que forks agreguen el resto | *Enlace fijo solamente* (el 004): no entrega reunión por cita ni evento en calendario — exactamente lo que el dueño pidió superar. *Forks por proveedor*: ADR-001 demostró empíricamente el costo (la propia rama 004 quedó irrescatable en 26 días). La violación queda condicionada a la enmienda 1.4.0: apagado por defecto, aislado, degradable, credenciales propias, verificable — y con plan B explícito si se rechaza |
+| Principio II (contra la 1.3.0; RESUELTA por la enmienda 1.4.0 ratificada el 2026-08-26): servicios externos `zoom`/`google` fuera de la lista cerrada | Es el pedido del dueño y la ventaja competitiva declarada: la reunión debe entregarse donde el negocio ya vive (Zoom/Meet/Calendar), con contrato para que forks agreguen el resto | *Enlace fijo solamente* (el 004): no entrega reunión por cita ni evento en calendario — exactamente lo que el dueño pidió superar. *Forks por proveedor*: ADR-001 demostró empíricamente el costo (la propia rama 004 quedó irrescatable en 26 días). La enmienda habilitó la vía del conector opcional: apagado por defecto, aislado, degradable, credenciales propias, verificable |
 | Cinco tablas nuevas (vs. tres del 004) | Las dos extra son credenciales por proveedor | *Un jsonb genérico de credenciales*: rechazado por el precedente escrito del repo ("unas credenciales tienen forma fija y conocida: así conservan tipado e índices") y porque cada conector de fork trae SU forma |

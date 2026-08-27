@@ -1,9 +1,10 @@
 # Propuesta de enmienda constitucional — Conectores opcionales (1.3.0 → 1.4.0)
 
 **Feature**: `015-motor-agenda-universal` · **Fecha**: 2026-08-26 ·
-**Estado**: PROPUESTA — pendiente de aprobación del responsable del proyecto
-(Governance: "toda enmienda se propone por escrito describiendo el cambio y su
-motivación, se aprueba por el responsable del proyecto").
+**Estado**: **RATIFICADA** por el responsable del proyecto el 2026-08-26 y
+**APLICADA** — constitución 1.3.0 → 1.4.0 con su Sync Impact Report, propagada
+a `CLAUDE.md`. (Governance: "toda enmienda se propone por escrito describiendo
+el cambio y su motivación, se aprueba por el responsable del proyecto".)
 
 ## Qué se propone cambiar
 
@@ -81,3 +82,13 @@ token de OpenRouter. Nada más").
 3. Si se rechaza: el alcance de `015` se recorta a bandera + motor +
    `enlace-fijo` (ninguno viola el principio vigente) y los conectores externos
    quedan como especificación para forks.
+
+## Resolución (2026-08-26)
+
+Aprobada por el responsable del proyecto y aplicada el mismo día:
+`.specify/memory/constitution.md` pasó a **1.4.0** (Principio II expandido con
+la categoría de conectores opcionales y la frase de prohibición acotada al
+núcleo) y la regla de Soberanía de `CLAUDE.md` quedó sincronizada. Los
+conectores externos de la feature 015 (`zoom`, `google`) quedan
+constitucionalmente habilitados bajo las cinco condiciones; el plan B de
+recorte queda sin efecto.
