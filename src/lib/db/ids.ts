@@ -19,6 +19,12 @@ const prefixes = {
   testRun: "run",
   testCase: "case",
   mediaAsset: "ma",
+  // 015 — motor de agenda
+  calendarSettings: "cal",
+  booking: "bk",
+  offeredSlot: "ofs",
+  zoomCredentials: "zcred",
+  googleCredentials: "gcred",
 } as const;
 
 export type IdKind = keyof typeof prefixes;

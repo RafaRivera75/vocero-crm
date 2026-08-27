@@ -621,6 +621,203 @@ export const agentTestRun = pgTable(
   ]
 );
 
+/* ============================================================
+ * 015 — Motor de agenda (detrás de la bandera AGENDA)
+ *
+ * Las tablas se crean SIEMPRE, encendida o apagada la bandera: una tabla
+ * vacía es inerte, y a cambio todas las instancias del mundo comparten la
+ * misma estructura y la misma cadena de migraciones (ADR-001).
+ * ============================================================ */
+
+/** Configuración de la agenda del negocio: una fila por organización. */
+export const calendarSettings = pgTable(
+  "calendar_settings",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    /** `{"mon":[{"start":"09:00","end":"18:00"}]}` — hora de PARED, no UTC. */
+    weeklyHours: jsonb("weekly_hours").notNull(),
+    slotMinutes: integer("slot_minutes").notNull().default(30),
+    bufferMinutes: integer("buffer_minutes").notNull().default(0),
+    minNoticeHours: integer("min_notice_hours").notNull().default(2),
+    maxDaysAhead: integer("max_days_ahead").notNull().default(7),
+    timezone: text("timezone").notNull().default("America/Mexico_City"),
+    /**
+     * Cómo se entrega la reunión. `enlace-fijo` no habla con nadie: es el
+     * default y la razón de que encender la agenda no exija terceros.
+     * Un fork agrega el suyo al catálogo del código sin tocar esta columna.
+     */
+    connector: text("connector").notNull().default("enlace-fijo"),
+    /** Sala fija del conector `enlace-fijo`; null ⇒ citas sin link. */
+    meetingLink: text("meeting_link"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("calendar_settings_org_uq").on(t.organizationId)]
+);
+
+/**
+ * La cita. Una sola tabla para sesiones y bloqueos manuales: un bloqueo es
+ * una cita sin contacto que ocupa agenda igual.
+ */
+export const booking = pgTable(
+  "booking",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["session", "block"] })
+      .notNull()
+      .default("session"),
+    status: text("status", {
+      enum: ["agendada", "realizada", "no_show", "cancelada"],
+    })
+      .notNull()
+      .default("agendada"),
+    source: text("source", { enum: ["manual", "ai"] })
+      .notNull()
+      .default("manual"),
+    contactId: text("contact_id").references(() => contact.id, {
+      onDelete: "cascade",
+    }),
+    conversationId: text("conversation_id").references(() => conversation.id, {
+      onDelete: "set null",
+    }),
+    leadId: text("lead_id").references(() => lead.id, { onDelete: "set null" }),
+    /** Instante UTC. El horario semanal es de pared; esto ya está resuelto. */
+    scheduledAt: timestamp("scheduled_at").notNull(),
+    /** Capturada al crear: cambiar la configuración no reescribe el pasado. */
+    durationMinutes: integer("duration_minutes").notNull(),
+    /**
+     * Con qué conector nació la ENTREGA. Reprogramar y cancelar hablan con
+     * ESTE, no con el activo: si el negocio cambia de proveedor, las citas ya
+     * confirmadas siguen viviendo donde se crearon.
+     */
+    connector: text("connector"),
+    /** Id de la reunión/evento en el proveedor; null en `enlace-fijo`. */
+    externalRef: text("external_ref"),
+    /**
+     * El link que se le dio al cliente. Se COPIA, no se lee de la
+     * configuración: la cita es un hecho histórico, no una vista del presente.
+     */
+    meetingLink: text("meeting_link"),
+    /**
+     * El proveedor falló al crear la reunión. La cita existe igual —un tercero
+     * caído no cuesta la conversión— y el operador reintenta desde "Citas".
+     */
+    linkPending: boolean("link_pending").notNull().default(false),
+    /** Conversación del Laboratorio: jamás llama a un conector real. */
+    isTest: boolean("is_test").notNull().default(false),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [
+    index("booking_org_when_idx").on(t.organizationId, t.scheduledAt),
+    index("booking_org_status_idx").on(t.organizationId, t.status),
+    /**
+     * Anti doble-booking ATÓMICO. La re-validación al confirmar deja una
+     * ventana entre leer y escribir; esto la cierra en la BASE: dos
+     * confirmaciones simultáneas del mismo instante no pueden ganar las dos, y
+     * la perdedora recibe un 23505 que el servicio traduce a `slot_taken` con
+     * alternativas frescas. Las citas de prueba quedan fuera: no consumen la
+     * agenda real.
+     */
+    uniqueIndex("booking_org_active_slot_uq")
+      .on(t.organizationId, t.scheduledAt)
+      .where(
+        sql`${t.status} in ('agendada','realizada') and ${t.isTest} = false`
+      ),
+  ]
+);
+
+/**
+ * La memoria de lo ofrecido. Es lo que hace verificable el requisito
+ * innegociable: sin fila aquí, no hay reserva.
+ *
+ * Vive en el CRM y no en quien conduce la conversación porque Vocero promete
+ * "conecta TU propio cerebro": con la garantía del lado del cliente, cualquier
+ * cerebro podría reservar un instante que jamás se ofreció y el CRM lo
+ * aceptaría.
+ */
+export const offeredSlot = pgTable(
+  "offered_slot",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => conversation.id, { onDelete: "cascade" }),
+    startUtc: timestamp("start_utc").notNull(),
+    /** La etiqueta EXACTA que se le mostró al cliente. */
+    label: text("label").notNull(),
+    offeredAt: timestamp("offered_at").notNull().defaultNow(),
+  },
+  (t) => [index("offered_slot_conv_idx").on(t.conversationId, t.startUtc)]
+);
+
+/**
+ * Credenciales del conector Zoom (app Server-to-Server del propio negocio).
+ * Tabla explícita como las de WhatsApp e Instagram: unas credenciales tienen
+ * forma fija y conocida, y así conservan tipado e índices. El secreto se cifra
+ * con los mismos helpers; un segundo mecanismo sería otro que auditar.
+ */
+export const zoomCredentials = pgTable(
+  "zoom_credentials",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    clientId: text("client_id").notNull(),
+    secretCipher: text("secret_cipher").notNull(),
+    secretIv: text("secret_iv").notNull(),
+    secretTag: text("secret_tag").notNull(),
+    /** `error` SE ESCRIBE cuando el proveedor rechaza la autenticación. */
+    status: text("status", { enum: ["connected", "error"] })
+      .notNull()
+      .default("connected"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("zoom_credentials_org_uq").on(t.organizationId)]
+);
+
+/**
+ * Credenciales del conector Google (Calendar + Meet), de la app de Google
+ * Cloud del propio negocio. DOS secretos cifrados: el client secret y el
+ * refresh token pegado una sola vez.
+ */
+export const googleCredentials = pgTable(
+  "google_credentials",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organization.id, { onDelete: "cascade" }),
+    clientId: text("client_id").notNull(),
+    clientSecretCipher: text("client_secret_cipher").notNull(),
+    clientSecretIv: text("client_secret_iv").notNull(),
+    clientSecretTag: text("client_secret_tag").notNull(),
+    refreshTokenCipher: text("refresh_token_cipher").notNull(),
+    refreshTokenIv: text("refresh_token_iv").notNull(),
+    refreshTokenTag: text("refresh_token_tag").notNull(),
+    calendarId: text("calendar_id").notNull().default("primary"),
+    status: text("status", { enum: ["connected", "error"] })
+      .notNull()
+      .default("connected"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("google_credentials_org_uq").on(t.organizationId)]
+);
+
 export const agentTestCase = pgTable(
   "agent_test_case",
   {
