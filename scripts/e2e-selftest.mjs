@@ -976,6 +976,7 @@ async function main() {
   );
 
   await agendaChecks();
+  await atribucionChecks();
 
   console.log(`\n===== ${checks - failures}/${checks} checks OK, ${failures} fallos =====`);
   process.exit(failures > 0 ? 1 : 0);
@@ -1415,3 +1416,375 @@ main().catch((err) => {
   console.error("ERROR FATAL:", err);
   process.exit(1);
 });
+
+/* ============================================================
+ * 016 — Atribución de anuncios y Conversions API (tests/e2e/us-atribucion.md)
+ *
+ * Cubre las dos configuraciones de la bandera, la conexión del dataset, la
+ * captura del anuncio, los dos eventos con la FORMA de su payload, el dedup,
+ * y —lo que más importa— que un fallo de Meta jamás cuesta el movimiento del
+ * lead.
+ *
+ * Los contactos llevan un sufijo por corrida: el dedup de conversiones es
+ * permanente por diseño, así que re-correr el arnés contra la MISMA base
+ * tiene que estrenar leads o estaría midiendo los de la corrida anterior.
+ * ============================================================ */
+
+async function atribucionChecks() {
+  const encendida = /^(on|1|true|si|sí|yes)$/i.test(
+    (process.env.ATRIBUCION ?? "").trim()
+  );
+  const SUF = String(Date.now()).slice(-6);
+  const tel = (n) => `52155${SUF}${n}`;
+  const nom = (base) => `${base} ${SUF}`;
+
+  console.log("\n== 016: la bandera de la atribución ==");
+
+  if (!encendida) {
+    for (const ruta of ["/api/settings/capi", "/api/settings/capi/events"]) {
+      const { res } = await api(ruta);
+      ok(
+        `${ruta} → 404 con la atribución apagada`,
+        res.status === 404,
+        `status=${res.status}`
+      );
+    }
+    const put = await api("/api/settings/capi", {
+      method: "PUT",
+      body: JSON.stringify({ datasetId: "ds-e2e" }),
+    });
+    ok(
+      "PUT /api/settings/capi → 404 con la atribución apagada",
+      put.res.status === 404,
+      `status=${put.res.status}`
+    );
+    const page = await fetch(`${BASE}/settings/ads`, { headers: { cookie } });
+    ok(
+      "la pantalla /settings/ads no existe",
+      page.status === 404,
+      `status=${page.status}`
+    );
+
+    // Y un mensaje que SÍ viene de un anuncio se atiende como cualquier otro:
+    // la instancia que no atribuye no se entera del referral, pero tampoco se
+    // rompe con él.
+    const inb = await api("/api/dev/wa-mock/inbound", {
+      method: "POST",
+      body: JSON.stringify({
+        phoneNumberId: PN,
+        from: tel("1"),
+        name: nom("Lead con anuncio apagada"),
+        text: "vi su anuncio",
+        ctwaClid: "clid-apagada",
+        waMessageId: `wamid.e2e.016.off.${SUF}`,
+      }),
+    });
+    ok("inbound con anuncio entregado igual", inb.res.ok);
+    await sleep(1400);
+    const convsOff = (await api("/api/conversations")).json?.conversations ?? [];
+    ok(
+      "la conversación del anuncio existe (la ingesta no se rompe)",
+      convsOff.some((c) => c.contact.name === nom("Lead con anuncio apagada"))
+    );
+    console.log(
+      "  (atribución apagada: el resto de los checks de 016 no aplican)"
+    );
+    return;
+  }
+
+  /* ---------------- US2: conectar el dataset ---------------- */
+
+  console.log("\n== 016: conectar el dataset (US2) ==");
+  // Se parte de desconectado: así el primer check afirma lo que dice afirmar
+  // aunque el arnés se re-corra sobre la misma base.
+  await api("/api/settings/capi", { method: "DELETE" });
+  const vacio = await api("/api/settings/capi");
+  ok(
+    "sin configurar responde 200 con capi: null (no 404)",
+    vacio.res.status === 200 && vacio.json?.capi === null,
+    JSON.stringify(vacio.json)
+  );
+
+  const board0 = (await api("/api/pipeline/board")).json;
+  const etapaCalificado = board0.stages.filter((s) => s.kind === "open").at(-1);
+  const etapaGanada = board0.stages.find((s) => s.kind === "won");
+  const etapaInicial = board0.stages.find((s) => s.kind === "open");
+
+  const etapaAjena = await api("/api/settings/capi", {
+    method: "PUT",
+    body: JSON.stringify({
+      datasetId: "ds-e2e",
+      qualifiedStageId: "stg_de_otro_negocio",
+    }),
+  });
+  ok(
+    "una etapa que no es del negocio se rechaza con 422 etapa_invalida",
+    etapaAjena.res.status === 422 &&
+      etapaAjena.json?.error?.code === "etapa_invalida",
+    `status=${etapaAjena.res.status} ${JSON.stringify(etapaAjena.json)}`
+  );
+
+  const guardado = await api("/api/settings/capi", {
+    method: "PUT",
+    body: JSON.stringify({
+      datasetId: "ds-e2e",
+      qualifiedStageId: etapaCalificado.id,
+    }),
+  });
+  ok(
+    "se guarda el dataset sin pegar token",
+    guardado.res.ok,
+    `status=${guardado.res.status}`
+  );
+
+  const cfg = (await api("/api/settings/capi")).json?.capi;
+  ok(
+    "reusó el token de WhatsApp y solo muestra sus últimos 4",
+    cfg?.datasetId === "ds-e2e" && cfg?.tokenLast4 === "-e2e",
+    JSON.stringify(cfg)
+  );
+  ok(
+    "el token completo NUNCA sale del servidor",
+    !JSON.stringify(cfg).includes("tok-e2e"),
+    JSON.stringify(cfg)
+  );
+
+  /* ---------------- US3 + US4: capturar y calificar ---------------- */
+
+  console.log("\n== 016: del anuncio al lead calificado (US3/US4) ==");
+  await api("/api/dev/wa-mock/capi-events", { method: "DELETE" });
+
+  const CLID = `clid-e2e-${SUF}`;
+  const NOMBRE_AD = nom("Lead de anuncio");
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: tel("2"),
+      name: NOMBRE_AD,
+      text: "hola, vengo del anuncio",
+      ctwaClid: CLID,
+      adHeadline: "Kit de verano",
+      waMessageId: `wamid.e2e.016.ad.${SUF}.1`,
+    }),
+  });
+  await sleep(1400);
+
+  // Segundo mensaje con OTRO referral: el primero gana y no se sobreescribe.
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: tel("2"),
+      name: NOMBRE_AD,
+      text: "sigo aquí",
+      ctwaClid: "clid-que-no-debe-ganar",
+      waMessageId: `wamid.e2e.016.ad.${SUF}.2`,
+    }),
+  });
+  await sleep(1200);
+
+  const board1 = (await api("/api/pipeline/board")).json;
+  const leadAd = board1.leads.find((l) => l.contact.name === NOMBRE_AD);
+  ok("el lead del anuncio existe en el tablero", !!leadAd);
+
+  const mov1 = await api(`/api/pipeline/leads/${leadAd.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaCalificado.id }),
+  });
+  ok(
+    "el lead se mueve a la etapa calificada",
+    mov1.res.ok,
+    `status=${mov1.res.status}`
+  );
+  await sleep(800);
+
+  const act1 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  const calificado = act1.find(
+    (e) => e.eventName === "QualifiedLead" && e.contactName === NOMBRE_AD
+  );
+  ok(
+    "se reportó QualifiedLead con acuse de Meta",
+    calificado?.status === "sent" && !!calificado?.fbTraceId,
+    JSON.stringify(calificado)
+  );
+  ok(
+    "la actividad dice de qué anuncio vino",
+    calificado?.adHeadline === "Kit de verano",
+    JSON.stringify(calificado)
+  );
+
+  const capi1 = (await api("/api/dev/wa-mock/capi-events")).json?.capiEvents ?? [];
+  const evento1 = capi1.find((e) => e.eventName === "QualifiedLead");
+  ok(
+    "el evento viajó con el ctwa_clid del PRIMER referral",
+    evento1?.ctwaClid === CLID,
+    JSON.stringify(evento1?.ctwaClid)
+  );
+  ok(
+    "y con custom_data.lead_stage (lo único reglable en Meta)",
+    evento1?.customData?.lead_stage === "qualified",
+    JSON.stringify(evento1?.customData)
+  );
+
+  // Dedup: sacarlo y volverlo a meter no re-reporta.
+  await api(`/api/pipeline/leads/${leadAd.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaInicial.id }),
+  });
+  await api(`/api/pipeline/leads/${leadAd.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaCalificado.id }),
+  });
+  await sleep(800);
+  const act2 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  const califsDeEste = act2.filter(
+    (e) => e.eventName === "QualifiedLead" && e.contactName === NOMBRE_AD
+  );
+  ok(
+    "volver a calificar NO reporta dos veces",
+    califsDeEste.length === 1,
+    `${califsDeEste.length} filas`
+  );
+
+  /* ---------------- US5: la venta ---------------- */
+
+  console.log("\n== 016: la venta (US5) ==");
+  const venta = await api(`/api/pipeline/leads/${leadAd.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      stageId: etapaGanada.id,
+      amountCents: 45050,
+      currency: "MXN",
+    }),
+  });
+  ok("el trato se marca como ganado", venta.res.ok, `status=${venta.res.status}`);
+  await sleep(800);
+
+  const act3 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  const compra = act3.find(
+    (e) => e.eventName === "Purchase" && e.contactName === NOMBRE_AD
+  );
+  ok("se reportó la venta", compra?.status === "sent", JSON.stringify(compra));
+
+  const capi2 = (await api("/api/dev/wa-mock/capi-events")).json?.capiEvents ?? [];
+  const evento2 = capi2.find((e) => e.eventName === "Purchase");
+  ok(
+    "la venta viajó en UNIDADES de la moneda, no en centavos",
+    evento2?.customData?.value === 450.5 &&
+      evento2?.customData?.currency === "MXN",
+    JSON.stringify(evento2?.customData)
+  );
+
+  await api(`/api/pipeline/leads/${leadAd.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaCalificado.id }),
+  });
+  await api(`/api/pipeline/leads/${leadAd.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaGanada.id }),
+  });
+  await sleep(800);
+  const act4 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  const comprasDeEste = act4.filter(
+    (e) => e.eventName === "Purchase" && e.contactName === NOMBRE_AD
+  );
+  ok(
+    "re-ganar NO manda una segunda compra (a Meta no se le des-envía nada)",
+    comprasDeEste.length === 1,
+    `${comprasDeEste.length} filas`
+  );
+
+  /* ---------------- Los caminos infelices ---------------- */
+
+  console.log("\n== 016: caminos infelices ==");
+
+  // Un lead que no vino de un anuncio: se registra el motivo y nada falla.
+  const NOMBRE_ORG = nom("Lead organico");
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: tel("3"),
+      name: NOMBRE_ORG,
+      text: "hola",
+      waMessageId: `wamid.e2e.016.org.${SUF}`,
+    }),
+  });
+  await sleep(1400);
+  const board2 = (await api("/api/pipeline/board")).json;
+  const leadOrg = board2.leads.find((l) => l.contact.name === NOMBRE_ORG);
+  await api(`/api/pipeline/leads/${leadOrg.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaCalificado.id }),
+  });
+  await sleep(800);
+  const act5 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  const omitido = act5.find((e) => e.contactName === NOMBRE_ORG);
+  ok(
+    "un lead sin anuncio queda OMITIDO con el motivo escrito",
+    omitido?.status === "skipped" && /ctwa_clid/.test(omitido?.error ?? ""),
+    JSON.stringify(omitido)
+  );
+
+  // Meta rechazando: el 200 mentiroso (events_received: 0).
+  const NOMBRE_FAIL = nom("Lead con Meta caido");
+  await api("/api/settings/capi", {
+    method: "PUT",
+    body: JSON.stringify({
+      datasetId: "ds-e2e-fail",
+      qualifiedStageId: etapaCalificado.id,
+    }),
+  });
+  await api("/api/dev/wa-mock/inbound", {
+    method: "POST",
+    body: JSON.stringify({
+      phoneNumberId: PN,
+      from: tel("4"),
+      name: NOMBRE_FAIL,
+      text: "vengo del anuncio",
+      ctwaClid: `clid-fail-${SUF}`,
+      waMessageId: `wamid.e2e.016.fail.${SUF}`,
+    }),
+  });
+  await sleep(1400);
+  const board3 = (await api("/api/pipeline/board")).json;
+  const leadFail = board3.leads.find((l) => l.contact.name === NOMBRE_FAIL);
+  const movFail = await api(`/api/pipeline/leads/${leadFail.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ stageId: etapaCalificado.id }),
+  });
+  ok(
+    "con Meta rechazando, el lead SE MUEVE igual",
+    movFail.res.ok,
+    `status=${movFail.res.status}`
+  );
+  await sleep(800);
+  const board4 = (await api("/api/pipeline/board")).json;
+  const leadFail2 = board4.leads.find((l) => l.contact.name === NOMBRE_FAIL);
+  ok(
+    "y se queda en la etapa a la que lo movieron",
+    leadFail2?.stageId === etapaCalificado.id,
+    JSON.stringify(leadFail2?.stageId)
+  );
+  const act6 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  const fallido = act6.find((e) => e.contactName === NOMBRE_FAIL);
+  ok(
+    "la fila queda FALLIDA con lo que dijo Meta (200 pero events_received=0)",
+    fallido?.status === "failed" &&
+      /events_received=0/.test(fallido?.error ?? ""),
+    JSON.stringify(fallido)
+  );
+
+  // Desconectar: deja de reportarse, pero la bitácora de lo ya dicho se queda.
+  const del = await api("/api/settings/capi", { method: "DELETE" });
+  ok("se puede desconectar", del.res.ok);
+  const trasBorrar = (await api("/api/settings/capi")).json;
+  ok("tras desconectar, no hay configuración", trasBorrar?.capi === null);
+  const act7 = (await api("/api/settings/capi/events")).json?.events ?? [];
+  ok(
+    "los eventos ya reportados NO se borran al desconectar",
+    act7.length >= 3,
+    `${act7.length} filas`
+  );
+}

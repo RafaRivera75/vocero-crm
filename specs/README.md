@@ -12,6 +12,7 @@ producto** — y saberlo antes de leerla ahorra una confusión.
 | `003-paridad-inbox-whatsapp` | — | spec |
 | `014-canal-instagram` | Ciclo completo | spec |
 | `015-motor-agenda-universal` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks + la enmienda constitucional que habilitó los conectores |
+| `016-atribucion-capi` | Ciclo completo | spec, plan, research, data-model, 2 contratos, quickstart, checklist, tasks |
 
 Los tres carriles —ciclo completo, ligero y exento— están definidos en el
 [Principio VI de la constitución](../.specify/memory/constitution.md). El
