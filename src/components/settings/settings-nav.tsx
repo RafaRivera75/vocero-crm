@@ -16,11 +16,24 @@ const TABS: Tab[] = [
 /** 015 — "Agenda" solo existe si esta instancia encendió la bandera. */
 const AGENDA_TAB: Tab = { href: "/settings/calendar", label: "Agenda" };
 
-export function SettingsNav({ agenda = false }: { agenda?: boolean }) {
+/** 016 — Igual con "Anuncios" y la bandera ATRIBUCION. */
+const ADS_TAB: Tab = { href: "/settings/ads", label: "Anuncios" };
+
+export function SettingsNav({
+  agenda = false,
+  atribucion = false,
+}: {
+  agenda?: boolean;
+  atribucion?: boolean;
+}) {
   const pathname = usePathname();
   // Qué pestañas existen lo decide el servidor y baja por prop: este es un
   // componente de cliente y no puede leer variables de entorno.
-  const tabs = agenda ? [...TABS, AGENDA_TAB] : TABS;
+  const tabs = [
+    ...TABS,
+    ...(agenda ? [AGENDA_TAB] : []),
+    ...(atribucion ? [ADS_TAB] : []),
+  ];
   return (
     <nav className="flex shrink-0 gap-1 overflow-x-auto border-b p-2 sm:w-44 sm:flex-col sm:space-y-1 sm:overflow-visible sm:border-b-0 sm:border-r sm:p-3">
       {tabs.map((t) => (

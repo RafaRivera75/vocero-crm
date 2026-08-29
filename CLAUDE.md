@@ -35,6 +35,7 @@ externas: el trabajo en segundo plano (agente, Laboratorio) es in-process.
 | Conectar TU propio bot en vez del agente | `src/app/api/bot/*` + `src/server/bot/auth.ts` (X-API-Key) |
 | La agenda (horarios, huecos, citas) | `src/server/agenda/` — detrás de la bandera `AGENDA` (`flag.ts`) |
 | Cómo se entrega la reunión (Zoom, Meet…) | `src/server/agenda/connectors/` + catálogo en `src/lib/agenda-connectors.ts` · guía: [docs/agenda-conectores.md](docs/agenda-conectores.md) |
+| La atribución de anuncios y el reporte a Meta | `src/server/attribution/` — detrás de la bandera `ATRIBUCION` (`flag.ts`) + `src/lib/meta/capi.ts` · guía: [docs/atribucion-capi.md](docs/atribucion-capi.md) |
 | UI | `src/components/` + `src/app/(app)/` |
 
 Los mocks del entorno de pruebas viven en `src/app/api/dev/` (wa-mock +
@@ -74,7 +75,7 @@ Ver [.specify/memory/constitution.md](.specify/memory/constitution.md).
 - **Sandbox del Laboratorio**: las conversaciones `is_test` JAMÁS tocan la API
   real — el sender lanza excepción (no lo "arregles": es un guardrail). Lo
   mismo vale para la agenda: una cita de prueba nunca llega a un conector.
-- **Módulos opcionales (015)**: lo que no usa toda instancia va detrás de una
+- **Módulos opcionales (015, 016)**: lo que no usa toda instancia va detrás de una
   bandera de despliegue, apagado por defecto, con su superficie en 404 y la
   migración aplicada igual. Nunca en una rama aparte
   ([ADR-001](docs/adr-001-canales-opcionales.md),

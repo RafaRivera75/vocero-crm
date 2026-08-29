@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-28
 
-**Status**: Draft
+**Status**: Implementada y verificada en vivo (2026-08-28) — arnés E2E en verde en las dos configuraciones de la bandera
 
 **Input**: Decisión del dueño 2026-08-28: llevar a Vocero raíz, **en modo
 bandera** (como la multicanalidad de IG y el motor de agenda), lo que el fork de

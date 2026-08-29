@@ -33,6 +33,11 @@ const envSchema = z.object({
   // 015: motor de agenda. Apagado por defecto — sin el, toda la superficie de
   // agenda responde 404 y la UI no la menciona. Ej.: AGENDA=on
   AGENDA: z.string().optional(),
+  // 016: atribucion de anuncios y reporte a la Conversions API de Meta.
+  // Apagada por defecto: sin ella no se captura de que anuncio vino una
+  // conversacion, no se le reporta nada a Meta y la superficie da 404.
+  // Ej.: ATRIBUCION=on
+  ATRIBUCION: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

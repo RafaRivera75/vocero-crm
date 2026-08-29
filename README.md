@@ -123,6 +123,25 @@ tu conector en tu fork siguiendo
 cae, la cita **se agenda igual** con el enlace pendiente de reintentar: un
 tercero caído no te cuesta la conversión.
 
+### 📈 Conversiones de anuncios (opcional, apagada por defecto)
+
+Si anuncias con **Click-to-WhatsApp**, Meta sabe qué conversaciones empezaron
+desde un anuncio, pero no cuáles sirvieron: sin nadie que se lo diga, optimiza
+hacia el público más barato de hacer escribir, que rara vez es el que compra.
+
+Enciéndela con `ATRIBUCION=on`, pega tu dataset en Ajustes → Anuncios (el token
+lo reusa de tu conexión de WhatsApp) y di qué etapa de TU pipeline significa
+"lead calificado". A partir de ahí el CRM le reporta a Meta el lead calificado y
+la venta cerrada —con su importe— por la **Conversions API**, y una tabla de
+actividad te dice qué se envió, con qué acuse y, cuando no salió, por qué.
+
+No se le pide nada al usuario que el CRM ya sepa: la venta cuelga de la etapa
+ganada que ya tienes, y todo se dispara desde la misma puerta que mueve leads,
+así que reporta igual si arrastras la tarjeta tú, el agente incluido o tu propio
+bot. Si Meta se cae, el lead se mueve igual: una conversión jamás vale un
+movimiento bloqueado. Los gotchas de Meta que cuesta descubrir solo están en
+[`docs/atribucion-capi.md`](docs/atribucion-capi.md).
+
 ### 📄 Plantillas · 👥 Multi-usuario · 🔐 Self-hosted
 
 Plantillas con varias variables `{{1}}…{{n}}` y aprobación de Meta
