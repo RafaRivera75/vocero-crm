@@ -1,10 +1,9 @@
 import { z } from "zod";
 import { chatJson } from "@/lib/ai";
-
+import { buildJudgePrompt } from "@/server/ai/prompts";
 import { createLogger } from "@/lib/logger";
 
 const log = createLogger("lab");
-import { buildJudgePrompt } from "@/server/ai/prompts";
 
 /** Veredicto estructurado del juez (FR-032, contrato ai.md). */
 export const Verdict = z.object({
