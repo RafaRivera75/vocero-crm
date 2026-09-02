@@ -100,11 +100,18 @@ function stripEmpty(env: NodeJS.ProcessEnv): Record<string, string> {
   return out;
 }
 
-/** true si el entorno de pruebas interno (mocks) está habilitado y NO es producción. */
+/**
+ * true si el entorno de pruebas interno (mocks) está habilitado y NO es producción.
+ * DEMO_MODE=true permite los mocks en un despliegue de demostración aunque el
+ * runtime sea producción (build de Next.js standalone): la UI real con un
+ * WhatsApp simulado para prospectos, sin tocar Meta. Nunca en la instancia
+ * de un cliente real.
+ */
 export function isMockEnabled(): boolean {
   return (
-    process.env.WA_MOCK_ENABLED === "true" &&
-    process.env.NODE_ENV !== "production"
+    (process.env.WA_MOCK_ENABLED === "true" &&
+      process.env.NODE_ENV !== "production") ||
+    process.env.DEMO_MODE === "true"
   );
 }
 
