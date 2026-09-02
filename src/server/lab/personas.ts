@@ -2,6 +2,11 @@
  * Las 6 personas GUIONADAS del Laboratorio (FR-030). El cliente simulado no
  * usa LLM: son secuencias fijas — determinismo total del lado del cliente.
  * El agente que responde es el REAL (mismo pipeline de US3).
+ *
+ * 2026-09-01 (fork RafaRivera75 / piloto CreceConIA): guiones adaptados de
+ * ferretería a CLÍNICA DENTAL para validar el Laboratorio en otro rubro.
+ * Los arquetipos (comprador decidido, pregunton, enojado, fuera de KB,
+ * pide humano, modismos) se mantienen igual.
  */
 
 export type Persona = {
@@ -18,14 +23,14 @@ export const PERSONAS: Persona[] = [
   {
     key: "comprador_decidido",
     label: "Comprador decidido",
-    description: "Sabe lo que quiere y va directo a comprar.",
+    description: "Sabe lo que quiere y va directo a agendar.",
     phone: "5210000000001",
     contactName: "[Prueba] Comprador decidido",
     script: [
       "Hola, buenas tardes",
-      "¿Tienen taladros inalámbricos disponibles?",
-      "Perfecto, ¿cuánto cuesta el más vendido?",
-      "Me convence, lo compro. ¿Cómo pago?",
+      "Quiero una limpieza dental, ¿cuánto cuesta?",
+      "Perfecto, ¿qué horarios tienen esta semana?",
+      "Me sirve, agéndame. Mi nombre es Camila Rodríguez",
     ],
   },
   {
@@ -35,22 +40,22 @@ export const PERSONAS: Persona[] = [
     phone: "5210000000002",
     contactName: "[Prueba] Preguntón de precios",
     script: [
-      "Hola, ¿qué precio tiene el martillo?",
-      "¿Y el desarmador de cruz?",
-      "¿Cuánto la caja de clavos de 2 pulgadas?",
-      "¿Hay descuento si llevo varias cosas?",
+      "Hola, ¿cuánto cuesta la valoración?",
+      "¿Y la limpieza dental?",
+      "¿Cuánto el blanqueamiento?",
+      "¿Hay descuento si llevo a mi familia?",
       "Ok, lo voy a pensar",
     ],
   },
   {
     key: "cliente_enojado",
     label: "Cliente enojado",
-    description: "Llega molesto por un problema con su compra.",
+    description: "Llega molesto por un problema con su tratamiento.",
     phone: "5210000000003",
     contactName: "[Prueba] Cliente enojado",
     script: [
       "Oigan, esto es el colmo",
-      "Compré una lijadora la semana pasada y ya no prende, es una porquería",
+      "Me hicieron una limpieza la semana pasada y me quedó hipersensible, es una porquería",
       "¿Me van a responder o qué? Quiero una solución YA",
       "Pues espero que sí porque no pienso perder mi dinero",
     ],
@@ -64,7 +69,7 @@ export const PERSONAS: Persona[] = [
     script: [
       "Hola, una pregunta",
       "¿Cuál es su política de garantías y devoluciones?",
-      "¿Y si el producto falla a los dos meses me lo cambian?",
+      "¿Y si el tratamiento falla a los dos meses lo repiten gratis?",
       "¿Dónde reclamo la garantía?",
     ],
   },
@@ -76,7 +81,7 @@ export const PERSONAS: Persona[] = [
     contactName: "[Prueba] Pide humano",
     script: [
       "Hola",
-      "Tengo un asunto delicado con un pedido",
+      "Tengo un asunto delicado con mi factura",
       "Prefiero que me atienda una persona, quiero hablar con un humano",
       "Gracias",
     ],
@@ -84,14 +89,14 @@ export const PERSONAS: Persona[] = [
   {
     key: "errores_modismos",
     label: "Errores y modismos",
-    description: "Escribe con faltas de ortografía y modismos mexicanos.",
+    description: "Escribe con faltas de ortografía y modismos colombianos.",
     phone: "5210000000006",
     contactName: "[Prueba] Errores y modismos",
     script: [
-      "ke onda, si benden pintura?",
-      "oiga y no le sabe si tienen tiner",
-      "cuanto x el galon d pintura blanca pa interiores",
-      "va, orita paso x la tienda, sale",
+      "ke onda, si azen limpiezas dentales?",
+      "oiga y no le sabe cuanto x el blanqueamiento",
+      "cuanto x la valoracion d primera vez",
+      "listo, entonces mañana llamo pa agendar, gracias",
     ],
   },
 ];
